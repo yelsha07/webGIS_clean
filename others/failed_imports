@@ -1,0 +1,93 @@
+import os
+import shutil
+import pandas as pd
+from sqlalchemy import create_engine
+import time
+
+print("Starting CSV import...")
+
+DB_NAME = "webGIS"
+DB_USER = "postgres"
+DB_PASSWORD = "ashley"
+DB_HOST = "localhost"
+DB_PORT = "5432"
+
+ROOT_FOLDER = "C:\\Users\\student\\Downloads\\CSV to postgreSQL"
+FAILED_FOLDER = os.path.join(ROOT_FOLDER, "FAILED_IMPORTS")
+TABLE_NAME = "NSRDB_WIND1"
+
+# Create failed folder if it doesn't exist
+os.makedirs(FAILED_FOLDER, exist_ok=True)
+
+print(f"Looking in: {ROOT_FOLDER}")
+
+engine = create_engine(f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}")
+
+success_count = 0
+error_count = 0
+error_files = []
+
+def import_csv_to_postgres(csv_file, province, municipality, max_retries=3, delay=5):
+    global success_count, error_count
+    attempts = 0
+    while attempts < max_retries:
+        try:
+            df = pd.read_csv(csv_file)
+            df.columns = df.columns.str.strip().str.replace(" ", "_").str.lower()
+
+            # Drop unwanted column
+            if "value" in df.columns:
+                df = df.drop(columns=["value"])
+
+            df["province"] = province
+            df["municipality"] = municipality
+
+            df.to_sql(TABLE_NAME, con=engine, if_exists='append', index=False)
+
+            success_count += 1
+            print(f"Imported: {csv_file}")
+            return
+
+        except Exception as e:
+            attempts += 1
+            print(f"Attempt {attempts} failed for {csv_file}: {e}")
+            if attempts < max_retries:
+                time.sleep(delay)
+            else:
+                error_count += 1
+                error_files.append((csv_file, str(e)))
+
+                # Move the failed file to the FAILED_IMPORTS folder
+                try:
+                    failed_filename = os.path.basename(csv_file)
+                    destination_path = os.path.join(FAILED_FOLDER, failed_filename)
+                    shutil.move(csv_file, destination_path)
+                    print(f"Moved failed file to: {destination_path}")
+                except Exception as move_error:
+                    print(f"Failed to move file {csv_file} to {FAILED_FOLDER}: {move_error}")
+
+def process_csv_files(province_filter=None):
+    for province in os.listdir(ROOT_FOLDER):
+        if province_filter and province != province_filter:
+            continue
+
+        province_path = os.path.join(ROOT_FOLDER, province)
+        if os.path.isdir(province_path):
+            for municipality in os.listdir(province_path):
+                municipality_path = os.path.join(province_path, municipality)
+                if os.path.isdir(municipality_path):
+                    for filename in os.listdir(municipality_path):
+                        if filename.endswith(".csv"):
+                            file_path = os.path.join(municipality_path, filename)
+                            import_csv_to_postgres(file_path, province, municipality)
+
+    print("\nCSV Import Summary:")
+    print(f"Successfully imported: {success_count} files")
+    print(f"Failed imports: {error_count} files")
+    if error_files:
+        print("Error Details:")
+        for file, error in error_files:
+            print(f"   - {file}: {error}")
+
+if __name__ == "__main__":
+    process_csv_files()
