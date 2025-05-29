@@ -1,158 +1,158 @@
-# import calendar
-# from datetime import datetime, timedelta
-# import ephem
+import calendar
+from datetime import datetime, timedelta
+import ephem
 
-# import numpy as np
-# import matplotlib.pyplot as plt
-# from scipy.interpolate import interp1d
-# from scipy import integrate
-# import pandas as pd
-# import streamlit as st
-# import psycopg2 as sql
-# import math
-# import statistics
-# import plotly.express as px
-# import json
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.interpolate import interp1d
+from scipy import integrate
+import pandas as pd
+import streamlit as st
+import psycopg2 as sql
+import math
+import statistics
+import plotly.express as px
+import json
 
-# # Database connection function
-# def get_db_connection():
-#     return psycopg2.connect(
-#         dbname="webGIS",  
-#         user="postgres",       
-#         password="ashley",    
-#         host="localhost",       
-#         port="5432"
-#     )
+# Database connection function
+def get_db_connection():
+    return psycopg2.connect(
+        dbname="webGIS",  
+        user="postgres",       
+        password="ashley",    
+        host="localhost",       
+        port="5432"
+    )
 
-# def connect_to_db():  # utilized
-#   try:
-#     connection = sql.connect(
-#             dbname= "webGIS",
-#             user="postgres",
-#             password="ashley",
-#             host="localhost",
-#             port= "5432"
-#         )
+def connect_to_db():  # utilized
+  try:
+    connection = sql.connect(
+            dbname= "webGIS",
+            user="postgres",
+            password="ashley",
+            host="localhost",
+            port= "5432"
+        )
     
-#     #st.text("Database connection successful!")
-#     return connection
-#   except Exception as e:
-
-#     st.text("Database connection failed:")
-
-#     return None 
-
-
-
-# # Function to fetch data from PostgreSQL
-# def fetch_data_from_db(polygon_geojson):
-#     polygon_wkt = shape(polygon_geojson).wkt  # Convert GeoJSON to WKT format
+    #st.text("Database connection successful!")
+    return connection
+  except Exception as e:
     
-#     query = f"""
-#     SELECT name, ghi, wind_speed
-#     FROM municipalities
-#     WHERE ST_Within(geom, ST_GeomFromText('{polygon_wkt}', 4326));
-#     """
+    st.text("Database connection failed:")
 
-#     # Connect to DB, execute query, and return GeoDataFrame
-#     conn = get_db_connection()
-#     gdf = gpd.read_postgis(query, conn, geom_col='geom')
-#     conn.close()
+    return None 
+
+
+
+# Function to fetch data from PostgreSQL
+def fetch_data_from_db(polygon_geojson):
+    polygon_wkt = shape(polygon_geojson).wkt  # Convert GeoJSON to WKT format
     
-#     return gdf
+    query = f"""
+    SELECT name, ghi, wind_speed
+    FROM municipalities
+    WHERE ST_Within(geom, ST_GeomFromText('{polygon_wkt}', 4326));
+    """
 
-# def db_fetch_hourly_solar(valid_points:list, municipality = None):
-#   """ returns in this format:           Lat | Long | Month | Day | Hour | GHI | MuniCipality 
-#                               point a                               1                        
-#                               point b                               1                        """
+    # Connect to DB, execute query, and return GeoDataFrame
+    conn = get_db_connection()
+    gdf = gpd.read_postgis(query, conn, geom_col='geom')
+    conn.close()
+    
+    return gdf
 
-#   working_db = connect_to_db()
-#   while working_db == None:
-#     working_db = connect_to_db()
+def db_fetch_hourly_solar(valid_points:list, municipality = None):
+  """ returns in this format:           Lat | Long | Month | Day | Hour | GHI | MuniCipality 
+                              point a                               1                        
+                              point b                               1                        """
 
-#   pointer = working_db.cursor()
+  working_db = connect_to_db()
+  while working_db == None:
+    working_db = connect_to_db()
 
-#   prep_points = ', '.join(['(%s, %s)'] * len(valid_points))
-#   coords = [coord for point in valid_points for coord in point]
+  pointer = working_db.cursor()
 
-#   if municipality == None:
-#     query = f"""SELECT latitude, longitude, "Year", "Month", "Day", "Hour", "GHI", "municipality"
-#     FROM "NSRDB_SOLAR"
-#     WHERE (ROUND(longitude::NUMERIC, 6), ROUND(latitude::NUMERIC, 6)) IN ({prep_points})
-#     ORDER BY "Month" ASC, "Day" ASC, "Hour" ASC;"""
+  prep_points = ', '.join(['(%s, %s)'] * len(valid_points))
+  coords = [coord for point in valid_points for coord in point]
 
-#     pointer.execute(query, coords)
+  if municipality == None:
+    query = f"""SELECT latitude, longitude, "Year", "Month", "Day", "Hour", "GHI", "municipality"
+    FROM "NSRDB_SOLAR"
+    WHERE (ROUND(lon_rounded::NUMERIC, 6), ROUND(lat_rounded::NUMERIC, 6)) IN ({prep_points})
+    ORDER BY "Month" ASC, "Day" ASC, "Hour" ASC;"""
 
-#     solar_data = pointer.fetchall()
+    pointer.execute(query, coords)
 
-#     pointer.close()
-#     working_db.close()
+    solar_data = pointer.fetchall()
 
-#     return solar_data
+    pointer.close()
+    working_db.close()
+
+    return solar_data
   
-#   else:
-#     query = f"""SELECT latitude, longitude, "Year", "Month", "Day", "Hour", "GHI", "municipality"
-#     FROM "NSRDB_SOLAR"
-#     WHERE municipality = {municipality}
-#     AND (ROUND(longitude::NUMERIC, 6), ROUND(latitude::NUMERIC, 6)) IN ({prep_points})
-#     ORDER BY "Month" ASC, "Day" ASC, "Hour" ASC;"""
+  else:
+    query = f"""SELECT latitude, longitude, "Year", "Month", "Day", "Hour", "GHI", "municipality"
+    FROM "NSRDB_SOLAR"
+    WHERE municipality = {municipality}
+    AND (ROUND(lon_rounded::NUMERIC, 6), ROUND(lat_rounded::NUMERIC, 6)) IN ({prep_points})
+    ORDER BY "Month" ASC, "Day" ASC, "Hour" ASC;"""
 
-#     pointer.execute(query, coords)
+    pointer.execute(query, coords)
 
-#     solar_data = pointer.fetchall()
+    solar_data = pointer.fetchall()
 
-#     pointer.close()
-#     working_db.close()
+    pointer.close()
+    working_db.close()
 
-#     return solar_data
+    return solar_data
   
-# def db_fetch_IRENA_solar(valid_points:list, municipality = None):
-#   """ returns in this format:           longitude (xcoord) | latitude (ycoord) | jan ghi | ... | dec ghi | municipality
-#                               point a                                                       
-#                               point b                                                       """
+def db_fetch_IRENA_solar(valid_points:list, municipality = None):
+  """ returns in this format:           longitude (xcoord) | latitude (ycoord) | jan ghi | ... | dec ghi | municipality
+                              point a                                                       
+                              point b                                                       """
 
-#   working_db = connect_to_db()
-#   while working_db == None:
-#     working_db = connect_to_db()
+  working_db = connect_to_db()
+  while working_db == None:
+    working_db = connect_to_db()
 
-#   pointer = working_db.cursor()
-#   prep_points = ', '.join(['(%s, %s)'] * len(valid_points))
-#   coords = [coord for point in valid_points for coord in point]
+  pointer = working_db.cursor()
+  prep_points = ', '.join(['(%s, %s)'] * len(valid_points))
+  coords = [coord for point in valid_points for coord in point]
 
-#   if municipality == None:
-#     query = f"""
-#     SELECT xcoord, ycoord,"jan ghi1",
-#     "feb ghi1",
-#     "mar ghi1",
-#     "apr ghi1",
-#     "may ghi1",
-#     "jun ghi1",
-#     "jul ghi1",
-#     "aug ghi1",
-#     "sep ghi1",
-#     "oct ghi1",
-#     "nov ghi1",
-#     "dec ghi1"
-#     FROM "IRENA_GHI_WS20_WS60 "
-#     WHERE (ROUND(xcoord::NUMERIC, 6), ROUND(ycoord::NUMERIC, 6)) IN ({prep_points});"""
+  if municipality == None:
+    query = f"""
+    SELECT xcoord, ycoord,"jan ghi1",
+    "feb ghi1",
+    "mar ghi1",
+    "apr ghi1",
+    "may ghi1",
+    "jun ghi1",
+    "jul ghi1",
+    "aug ghi1",
+    "sep ghi1",
+    "oct ghi1",
+    "nov ghi1",
+    "dec ghi1"
+    FROM "IRENA_GHI_WS20_WS60 "
+    WHERE (ROUND(xcoord::NUMERIC, 6), ROUND(ycoord::NUMERIC, 6)) IN ({prep_points});"""
 
-#     pointer.execute(query, coords)
-#     solar_data = pointer.fetchall()
-#     pointer.close()
-#     working_db.close()
+    pointer.execute(query, coords)
+    solar_data = pointer.fetchall()
+    pointer.close()
+    working_db.close()
 
-#     final_solar_data = []
-#     temp = []
+    final_solar_data = []
+    temp = []
 
-#     for row in solar_data:
-#       for element in row:
-#         temp.append(float(element))
-#       final_solar_data.append(tuple(temp))
-#       temp = []
+    for row in solar_data:
+      for element in row:
+        temp.append(float(element))
+      final_solar_data.append(tuple(temp))
+      temp = []
       
           
        
-#     return final_solar_data
+    return final_solar_data
 
 # munip_hourly_list = []  # List to store average GHI per hour
 # sum_months = [] # NSRDB monthly ghi data
@@ -361,33 +361,33 @@
 
 #   return municip_data
 
-# def look_up_points(points:list, tables:list):
-#   ''' checks whether the points are not part of exclusion areas '''
+def look_up_points(points:list, tables:list):
+  ''' checks whether the points are not part of exclusion areas '''
 
-#   if len(tables) == 0:
-#     return "default"
+  if len(tables) == 0:
+    return "default"
   
-#   exists_conditions = [
-#       f"EXISTS (SELECT 1 FROM \"{table}\" WHERE ROUND(\"{table}\".xcoord, 6) = input_points.xcoord "
-#       f"AND ROUND(\"{table}\".ycoord, 6) = input_points.ycoord)"
-#       for table in tables
-#   ]
-#   sql_query = f"""
-#         SELECT xcoord, ycoord
-#         FROM (VALUES {', '.join(['(%s, %s)'] * len(points))}) AS input_points(xcoord, ycoord)
-#         WHERE {' AND '.join(exists_conditions)};
-#     """
+  exists_conditions = [
+      f"EXISTS (SELECT 1 FROM \"{table}\" WHERE ROUND(\"{table}\".xcoord, 6) = input_points.xcoord "
+      f"AND ROUND(\"{table}\".ycoord, 6) = input_points.ycoord)"
+      for table in tables
+  ]
+  sql_query = f"""
+        SELECT xcoord, ycoord
+        FROM (VALUES {', '.join(['(%s, %s)'] * len(points))}) AS input_points(xcoord, ycoord)
+        WHERE {' AND '.join(exists_conditions)};
+    """
   
-#   query_params = [coord for point in points for coord in point]
+  query_params = [coord for point in points for coord in point]
 
-#   connection = connect_to_db()
-#   with connection.cursor() as cursor:
-#         cursor.execute(sql_query, query_params)
-#         matching_points = cursor.fetchall()
+  connection = connect_to_db()
+  with connection.cursor() as cursor:
+        cursor.execute(sql_query, query_params)
+        matching_points = cursor.fetchall()
 
-#   matching_points = [(float(row[0]), float(row[1])) for row in matching_points]
+  matching_points = [(float(row[0]), float(row[1])) for row in matching_points]
 
-#   return matching_points
+  return matching_points
 
 # def db_fetch_sample_points(valid_points = None, municipality = None): # utilized
 #   """ """

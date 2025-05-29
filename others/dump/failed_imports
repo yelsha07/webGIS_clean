@@ -14,7 +14,7 @@ DB_PORT = "5432"
 
 ROOT_FOLDER = "C:\\Users\\student\\Downloads\\CSV to postgreSQL"
 FAILED_FOLDER = os.path.join(ROOT_FOLDER, "FAILED_IMPORTS")
-TABLE_NAME = "NSRDB_WIND1"
+TABLE_NAME = "NSRDB_SOLAR_BICOL"
 
 # Create failed folder if it doesn't exist
 os.makedirs(FAILED_FOLDER, exist_ok=True)

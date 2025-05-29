@@ -9,14 +9,12 @@ import streamlit as st
 import geopandas as gpd
 import pandas as pd
 import folium
-import time
 import os
 import requests
 import zipfile
 import io
 import tempfile
-import ephem
-from datetime import datetime, timedelta
+from datetime import datetime
 from streamlit_folium import folium_static, st_folium
 from shapely.geometry import Point, Polygon
 import matplotlib.pyplot as plt
@@ -30,23 +28,18 @@ import statistics
 import plotly.express as px
 import json
 
+import others.solar_algo_newt as solar
 import sys
 
 
-
+# Add the parent directory to the system path so 'logic' can be found
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-
-import others.solar_algo_new as solar
 
 
 # Set page config
 st.set_page_config(layout="wide", page_title="Philippine Solar Potential Assessment")
-st.markdown("""
-    <h1 style='text-align: center;'>
-        Solar Potential Assessment
-    </h1>
-""", unsafe_allow_html=True)
+
+st.title("Solar Potential Assessment")
 st.markdown("Select a municipality, or draw a custom area (minimum 3km x 3km) to assess solar potential.")
 
 # --- Static file paths --- 
@@ -156,6 +149,8 @@ with st.spinner("Loading data from GitHub..."):
 if gdf_municipalities is None or gdf_points is None:
     st.error("Failed to load required datasets. Please check your internet connection and try again.")
     st.stop()
+
+st.success(f"Successfully loaded {len(gdf_municipalities)} municipalities and {len(gdf_points)} points!")
 
 # --- Clean GeoDataFrames ---
 gdf_municipalities_clean = clean_gdf_for_json(gdf_municipalities)
@@ -404,10 +399,10 @@ col1, col2 = st.columns([1, 2])
 
 if st.session_state.selection_mode == "municipality":
     with col1:
-        # st.subheader("Municipality Selection")
-        # st.markdown("You can select a municipality either by:")
-        # st.markdown("1. Clicking on the map")
-        # st.markdown("2. Using the dropdown selector")
+        st.subheader("Municipality Selection")
+        st.markdown("You can select a municipality either by:")
+        st.markdown("1. Clicking on the map")
+        st.markdown("2. Using the dropdown selector")
         
         # Create the dropdown first
         municipality_list = [""] + sorted(gdf_municipalities[municipality_name_col].tolist())
@@ -447,29 +442,7 @@ if st.session_state.selection_mode == "municipality":
                     
 
         # let user choose the slope restrictions
-        # let user choose the slope restrictions
-        slope_checker = st.checkbox("Do you wish to apply slope limits?")
-        if slope_checker:
-            slope = st.number_input("Enter a value (in %) to filter out slope of the land", min_value=None, max_value=None, value=5.00, step= 0.01, format ="%.4f")
-
-        #af and eta slider
-        af = st.slider(
-            "Area Factor (af)", 
-            min_value=0.0, 
-            max_value=1.0, 
-            value=0.7, 
-            step=0.01,
-            key="nsrdb_af"  # Add unique key
-        )
-        eta = st.slider(
-            "Panel Efficiency (eta)", 
-            min_value=0.0, 
-            max_value=1.0, 
-            value=0.2, 
-            step=0.01,
-            key="nsrdb_eta"  # Add unique key
-        )
-
+        slope = st.slider("Filter out slope of the land (%):", min_value=0.0, max_value=10.0, value=1.0, step=0.1)
 
         # Handle dropdown selection - separate from widget creation
         if selected_from_dropdown and not st.session_state.map_click_source:
@@ -479,25 +452,25 @@ if st.session_state.selection_mode == "municipality":
         st.session_state.map_click_source = False
         
         # MOVED METRICS BELOW SELECTION INSTRUCTIONS
-        # st.markdown("### 📊 Dataset Information")
-        # col_metric1, col_metric2 = st.columns(2)
+        st.markdown("### 📊 Dataset Information")
+        col_metric1, col_metric2 = st.columns(2)
         
-        # # Center-align the metrics with custom markdown and HTML
-        # with col_metric1:
-        #     st.markdown(f"""
-        #     <div style="text-align: center;">
-        #         <p style="font-size: 14px; color: gray;">Municipalities</p>
-        #         <p style="font-size: 28px; font-weight: bold;">{len(gdf_municipalities)}</p>
-        #     </div>
-        #     """, unsafe_allow_html=True)
+        # Center-align the metrics with custom markdown and HTML
+        with col_metric1:
+            st.markdown(f"""
+            <div style="text-align: center;">
+                <p style="font-size: 14px; color: gray;">Municipalities</p>
+                <p style="font-size: 28px; font-weight: bold;">{len(gdf_municipalities)}</p>
+            </div>
+            """, unsafe_allow_html=True)
         
-        # with col_metric2:
-        #     st.markdown(f"""
-        #     <div style="text-align: center;">
-        #         <p style="font-size: 14px; color: gray;">Points</p>
-        #         <p style="font-size: 28px; font-weight: bold;">{len(gdf_points)}</p>
-        #     </div>
-        #     """, unsafe_allow_html=True)
+        with col_metric2:
+            st.markdown(f"""
+            <div style="text-align: center;">
+                <p style="font-size: 14px; color: gray;">Points</p>
+                <p style="font-size: 28px; font-weight: bold;">{len(gdf_points)}</p>
+            </div>
+            """, unsafe_allow_html=True)
 
     with col2:
         # Create and display selection map in main content area with DOUBLED HEIGHT
@@ -513,76 +486,23 @@ if st.session_state.selection_mode == "municipality":
             clicked_location = map_output["last_clicked"]
             point = Point(clicked_location["lng"], clicked_location["lat"])
             click_gdf = gpd.GeoDataFrame([{"geometry": point}], crs="EPSG:4326")
-
-            current_zoom = 6  # Default zoom level
-            if hasattr(selection_map, 'get_zoom'):
-                try:
-                    current_zoom = selection_map.get_zoom()
-                except:
-                    pass
-    
-    # Adjust search radius based on zoom level
-    # Lower zoom = larger search radius
-            search_radius = max(0.05, 0.5 / (current_zoom or 1))
-
+            
             # Use spatial join to find municipality containing the clicked point
             try:
-                # First try: Check if point is directly within any municipality
                 matched = gpd.sjoin(click_gdf, gdf_municipalities, predicate="within", how="left")
                 
                 if not matched.empty and not pd.isna(matched.iloc[0][municipality_name_col]):
                     selected_municipality = matched.iloc[0][municipality_name_col]
-                    st.session_state.click_confidence = "exact"
                 else:
-                    # Second try: Create a buffer around the clicked point based on zoom level
-                    buffered_point = point.buffer(search_radius)
-                    buffer_gdf = gpd.GeoDataFrame([{"geometry": buffered_point}], crs="EPSG:4326")
-                    
-                    # Find municipalities that intersect with the buffer
-                    intersecting = gpd.sjoin(gdf_municipalities, buffer_gdf, predicate="intersects", how="inner")
-                    
-                    if not intersecting.empty:
-                        # Find municipality with centroid closest to click point
-                        intersecting["distance"] = intersecting.geometry.centroid.distance(point)
-                        nearest_row = intersecting.loc[intersecting["distance"].idxmin()]
-                        selected_municipality = nearest_row[municipality_name_col]
-                        st.session_state.click_confidence = "buffer"
-                    else:
-                        # If still no match, find overall nearest municipality by centroid
-                        gdf_municipalities["distance"] = gdf_municipalities.geometry.centroid.distance(point)
-                        nearest_row = gdf_municipalities.loc[gdf_municipalities["distance"].idxmin()]
-                        selected_municipality = nearest_row[municipality_name_col]
-                        st.session_state.click_confidence = "nearest"
+                    # If no exact match found, find nearest municipality
+                    gdf_municipalities["distance"] = gdf_municipalities.geometry.centroid.distance(point)
+                    nearest_row = gdf_municipalities.loc[gdf_municipalities["distance"].idxmin()]
+                    selected_municipality = nearest_row[municipality_name_col]
+                    st.info(f"Selected nearest municipality: {selected_municipality}")
                 
-                # Add confirmation when using approximate methods at low zoom levels
-                if current_zoom < 8 and st.session_state.click_confidence != "exact":
-                    if "last_click_time" not in st.session_state:
-                        st.session_state.last_click_time = 0
-                        
-                    # Prevent rapid double-clicks from causing issues
-                    current_time = time.time()
-                    if current_time - st.session_state.last_click_time > 1.0:  # 1 second debounce
-                        st.session_state.last_click_time = current_time
-                        
-                        # Show confirmation with option to cancel
-                        st.session_state.pending_municipality = selected_municipality
-                        confirm = st.toast(f"Selected {selected_municipality}. Click again to confirm.")
-                        
-                        # Only update if this is a confirmation click
-                        if (st.session_state.get("pending_municipality") == selected_municipality and 
-                            st.session_state.get("pending_confirmed", False)):
-                            st.session_state.pending_confirmed = False
-                            if select_municipality(selected_municipality, source="map"):
-                                time.sleep(0.3)  # Small delay to ensure UI updates properly
-                                st.rerun()
-                        else:
-                            st.session_state.pending_confirmed = True
-                else:
-                    # Direct selection for higher zoom levels or exact matches
-                    if select_municipality(selected_municipality, source="map"):
-                        time.sleep(0.2)  # Small delay to prevent accidental clicks
-                        st.rerun()
-                        
+                # Update selection through the central function
+                if select_municipality(selected_municipality, source="map"):
+                    st.rerun()
             except Exception as e:
                 st.error(f"Error selecting municipality: {e}")
 
@@ -592,7 +512,7 @@ if st.session_state.selection_mode == "municipality":
         st.stop()
 
     # Display the selected municipality
-    # st.subheader(f"Selected Municipality: {st.session_state.selected_muni}")
+    st.subheader(f"Selected Municipality: {st.session_state.selected_muni}")
 
     # --- Geo selection ---
     selected_gdf = gdf_municipalities[gdf_municipalities[municipality_name_col] == st.session_state.selected_muni]
@@ -635,191 +555,132 @@ if st.session_state.selection_mode == "municipality":
 
 
     # Display municipality metrics
-    st.markdown("""
-    <div style="
-        background-color: #F75A5A;
-        padding: 12px 20px;
-        border-radius: 10px;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-        font-size: 24px;
-        font-weight: 600;
-        color: #FFFDF6;
-        margin-bottom: 15px;
-    ">
-        Municipality Information
-    </div>
-""", unsafe_allow_html=True)
+    st.subheader("📊 Municipality Information")
     c1, c2 = st.columns(2)
-    disp1, disp2, disp3 = st.columns([1,1,1])
-    interactive, summary = st.columns([2,1])
+    c1.metric("Area", f"{area_km2:.2f} km²")
+    c2.metric("Points within Municipality", f"{len(intersecting)}")
+
     # --- Map ---
-    with interactive:
-        m = folium.Map(location=[center_lat, center_lon], zoom_start=9)
+    st.subheader("🗺️ Interactive Map")
+    m = folium.Map(location=[center_lat, center_lon], zoom_start=9)
 
-        # Add municipality boundary
-        folium.GeoJson(
-            selected_gdf.geometry,
-            name="Municipality",
-            style_function=lambda x: {"color": "#0000ff", "fillColor": "#3388ff", "weight": 2, "fillOpacity": 0.2}
-        ).add_to(m)
+    # Add municipality boundary
+    folium.GeoJson(
+        selected_gdf.geometry,
+        name="Municipality",
+        style_function=lambda x: {"color": "#0000ff", "fillColor": "#3388ff", "weight": 2, "fillOpacity": 0.2}
+    ).add_to(m)
 
-        # Use marker cluster for large datasets to improve performance
-        use_clustering = len(intersecting) > 100
+    # Use marker cluster for large datasets to improve performance
+    use_clustering = len(intersecting) > 100
+    
+    if use_clustering:
+        # Create marker cluster
+        marker_cluster = MarkerCluster(name="Solar Points (Clustered)")
         
-        if use_clustering:
-            # Create marker cluster
-            marker_cluster = MarkerCluster(name="Solar Points (Clustered)")
+        # Add points within the municipality to cluster
+        for _, row in intersecting.iterrows():
+            folium.CircleMarker(
+                location=[row.geometry.y, row.geometry.x], 
+                radius=5, 
+                color="red",
+                fill=True,
+                fill_color="red",
+                fill_opacity=0.7,
+                popup=f"Point ID: {row.name}"
+            ).add_to(marker_cluster)
             
-            # Add points within the municipality to cluster
-            for _, row in intersecting.iterrows():
+        marker_cluster.add_to(m)
+    else:
+        # For smaller datasets, use regular feature group
+        point_group = folium.FeatureGroup(name="Solar Points")
+        
+        # Add points within the municipality
+        for _, row in intersecting.iterrows():
+            folium.CircleMarker(
+                location=[row.geometry.y, row.geometry.x], 
+                radius=5, 
+                color="red",
+                fill=True,
+                fill_color="red",
+                fill_opacity=0.7,
+                popup=f"Point ID: {row.name}"
+            ).add_to(point_group)
+        
+        point_group.add_to(m)
+
+    # Add a limited number of background points for context
+    if len(gdf_points) > len(intersecting):
+        # Limit number of background points for performance
+        background_limit = min(500, len(gdf_points) - len(intersecting))
+        if background_limit > 0:
+            background_points = gdf_points[~gdf_points.index.isin(intersecting.index)].sample(background_limit)
+            bg_group = folium.FeatureGroup(name="Background Points")
+            
+            for _, row in background_points.iterrows():
                 folium.CircleMarker(
                     location=[row.geometry.y, row.geometry.x], 
-                    radius=5, 
-                    color="red",
-                    fill=True,
-                    fill_color="red",
-                    fill_opacity=0.7,
-                    popup=f"Point ID: {row.name}"
-                ).add_to(marker_cluster)
+                    radius=2, 
+                    color='gray', 
+                    fill_opacity=0.4
+                ).add_to(bg_group)
                 
-            marker_cluster.add_to(m)
-        else:
-            # For smaller datasets, use regular feature group
-            point_group = folium.FeatureGroup(name="Solar Points")
-            
-            # Add points within the municipality
-            for _, row in intersecting.iterrows():
-                folium.CircleMarker(
-                    location=[row.geometry.y, row.geometry.x], 
-                    radius=5, 
-                    color="red",
-                    fill=True,
-                    fill_color="red",
-                    fill_opacity=0.7,
-                    popup=f"Point ID: {row.name}"
-                ).add_to(point_group)
-            
-            point_group.add_to(m)
+            bg_group.add_to(m)
 
-        # Add a limited number of background points for context
-        if len(gdf_points) > len(intersecting):
-            # Limit number of background points for performance
-            background_limit = min(500, len(gdf_points) - len(intersecting))
-            if background_limit > 0:
-                background_points = gdf_points[~gdf_points.index.isin(intersecting.index)].sample(background_limit)
-                bg_group = folium.FeatureGroup(name="Background Points")
-                
-                for _, row in background_points.iterrows():
-                    folium.CircleMarker(
-                        location=[row.geometry.y, row.geometry.x], 
-                        radius=2, 
-                        color='gray', 
-                        fill_opacity=0.4
-                    ).add_to(bg_group)
-                    
-                bg_group.add_to(m)
+    # Add layer control
+    folium.LayerControl().add_to(m)
 
-        # Add layer control
-        folium.LayerControl().add_to(m)
-
-        # Display the map
-        folium_static(m)
+    # Display the map
+    folium_static(m)
 
     # --- Table of points ---
-    # st.subheader(f"📍 {len(intersecting)} Points Inside {st.session_state.selected_muni}")
-    # if not intersecting.empty:
-    #     display_cols = [col for col in intersecting.columns if col != 'geometry']
-    #     st.dataframe(intersecting[display_cols])
-    # else:
-    #     st.info("No points found within this municipality.")
+    st.subheader(f"📍 {len(intersecting)} Points Inside {st.session_state.selected_muni}")
+    if not intersecting.empty:
+        display_cols = [col for col in intersecting.columns if col != 'geometry']
+        st.dataframe(intersecting[display_cols])
+    else:
+        st.info("No points found within this municipality.")
 
 else:  # Draw Custom Area mode
     with col1:
-
-            # # Create the dropdown first
-            # municipality_list = [""] + sorted(gdf_municipalities[municipality_name_col].tolist())
-
-            # # Create dropdown without on_change handler to avoid circular dependencies
-            # selected_from_dropdown = st.selectbox(
-            #     "Select a municipality:", 
-            #     municipality_list,
-            #     index=0 if st.session_state.selected_muni is None else 
-            #         municipality_list.index(st.session_state.selected_muni) if st.session_state.selected_muni in municipality_list else 0,
-            #     key="dropdown_muni"  # Changed key name to avoid conflict
-            # )
-
-            # # Handle dropdown selection - separate from widget creation
-            # if selected_from_dropdown and not st.session_state.map_click_source:
-            #     if select_municipality(selected_from_dropdown):
-            #         st.rerun()
-            # # Reset map click source flag after dropdown handling
-            # st.session_state.map_click_source = False
+        st.subheader("Draw Custom Area")
+        st.markdown("Instructions:")
+        st.markdown("1. Use the rectangle tool in the map toolbar (top left)")
+        st.markdown("2. Draw a rectangle of at least 3km x 3km")
+        st.markdown("3. Area will be analyzed automatically")
         
-            # col_metric1, col_metric2 = st.columns(2)
-
-
-            # let user choose constraints first
-            st.write("Choose which constraints to apply.")
-
-            constraints_table = {0:"BuiltUp Constraints Removed", 1: "CADTs Constraints Removed", 2: "Forest Constraints Removed", 3: "Protected Areas Removed"}
-            choose_from = []
-
-            with st.container():
-                col1sub, col2sub = st.columns(2)
-
-                with col1sub:
-                    ancestral = st.checkbox("Ancestral Domains")
-                    if ancestral:
-                        choose_from.append(constraints_table[1])
-
-                    tree_cover = st.checkbox("Tree Covers")
-                    if tree_cover:
-                        choose_from.append(constraints_table[2])
-
-                with col2sub:
-                    land_use = st.checkbox("Land Use")
-                    if land_use:
-                        choose_from.append(constraints_table[0])
-                    protected_areas =  st.checkbox("Protected Areas")
-                    if protected_areas:
-                        choose_from.append(constraints_table[3])
-
-            # let user choose the slope restrictions
-            # let user choose the slope restrictions
-            slope_checker = st.checkbox("Do you wish to apply slope limits?")
-            if slope_checker:
-                slope = st.number_input("Enter a value (in %) to filter out slope of the land", min_value=None, max_value=None, value=5.00, step= 0.01, format ="%.4f")
-
-                    #af and eta slider
-            af = st.slider(
-                "Area Factor (af)", 
-                min_value=0.0, 
-                max_value=1.0, 
-                value=0.7, 
-                step=0.01,
-                key="nsrdb_af"  # Add unique key
-            )
-            eta = st.slider(
-                "Panel Efficiency (eta)", 
-                min_value=0.0, 
-                max_value=1.0, 
-                value=0.2, 
-                step=0.01,
-                key="nsrdb_eta"  # Add unique key
-            )
-
-
+        # METRICS BELOW DRAWING INSTRUCTIONS
+        st.markdown("### 📊 Dataset Information")
+        col_metric1, col_metric2 = st.columns(2)
+        
+        # Center-align the metrics with custom markdown and HTML
+        with col_metric1:
+            st.markdown(f"""
+            <div style="text-align: center;">
+                <p style="font-size: 14px; color: gray;">Total Points</p>
+                <p style="font-size: 28px; font-weight: bold;">{len(gdf_points)}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col_metric2:
+            st.markdown(f"""
+            <div style="text-align: center;">
+                <p style="font-size: 14px; color: gray;">Minimum Area</p>
+                <p style="font-size: 28px; font-weight: bold;">9 km²</p>
+            </div>
+            """, unsafe_allow_html=True)
+    
     with col2:
-            # Create map with drawing tools
+        # Create map with drawing tools
         try:
             drawing_map = create_drawing_map()
-                # Store previous drawings to detect changes
+            # Store previous drawings to detect changes
             previous_drawings = st.session_state.current_drawings
-                
-                # Use key parameter for the st_folium component to help Streamlit manage its state
+            
+            # Use key parameter for the st_folium component to help Streamlit manage its state
             map_data = st_folium(drawing_map, height=600, width=None, key="draw_map",
-                            returned_objects=["all_drawings"])
-                
+                           returned_objects=["all_drawings"])
+            
             # Store drawings in session state 
             # Store drawings in session state 
             if map_data and map_data.get("all_drawings"):
@@ -845,7 +706,7 @@ else:  # Draw Custom Area mode
         drawn_area = st.session_state.drawn_area
         
         # Display success message
-        #st.success(f"Area selected: {drawn_area['area_km2']:.2f} km² (Width: {drawn_area['width_km']:.2f} km, Height: {drawn_area['height_km']:.2f} km)")
+        st.success(f"Area selected: {drawn_area['area_km2']:.2f} km² (Width: {drawn_area['width_km']:.2f} km, Height: {drawn_area['height_km']:.2f} km)")
         
         # Find points within the drawn area
         try:
@@ -855,102 +716,77 @@ else:  # Draw Custom Area mode
             intersecting = gpd.GeoDataFrame(geometry=[], crs=gdf_points.crs)
         
         # Display area metrics
-        
-        st.markdown("""
-    <div style="
-        background-color: #F75A5A;
-        padding: 12px 20px;
-        border-radius: 10px;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-        font-size: 24px;
-        font-weight: 600;
-        color: #FFFDF6;
-        margin-bottom: 15px;
-    ">
-        Custom Area Information
-    </div>
-""", unsafe_allow_html=True)
-        
-        disp1, disp2, disp3 = st.columns([1,1,1])
-        interactive, summary = st.columns([2,1]) 
-        dis1, dis2, dis3 = st.columns([1,1,1])
-        
-        # c1, c2, c3 = st.columns(3)
-        # c1.metric("Area", f"{drawn_area['area_km2']:.2f} km²")
-        # c2.metric("Width x Height", f"{drawn_area['width_km']:.2f} km x {drawn_area['height_km']:.2f} km")
-        # c3.metric("Points within Area", f"{len(intersecting)}")
-
-        #handle column sizes here ----
+        st.subheader("📊 Custom Area Information")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Area", f"{drawn_area['area_km2']:.2f} km²")
+        c2.metric("Width x Height", f"{drawn_area['width_km']:.2f} km x {drawn_area['height_km']:.2f} km")
+        c3.metric("Points within Area", f"{len(intersecting)}")
         
         # Create and display map
-        with interactive:
-            area_map = folium.Map(location=drawn_area["center"], zoom_start=9)
-            
-            # Add the drawn polygon
-            drawn_gdf = gpd.GeoDataFrame([{"geometry": drawn_area["geometry"]}], crs="EPSG:4326")
-            folium.GeoJson(
-                drawn_gdf,
-                name="Custom Area",
-                style_function=lambda x: {"color": "#ff7800", "fillColor": "#ffff00", "weight": 2, "fillOpacity": 0.2}
-            ).add_to(area_map)
-            
-            # Use marker cluster for large datasets to improve performance
-            use_clustering = len(intersecting) > 100
-            
-            if use_clustering:
-                # Create marker cluster
-                marker_cluster = MarkerCluster(name="Solar Points (Clustered)")
-                
-                # Add points within the drawn area to cluster
-                for _, row in intersecting.iterrows():
-                    folium.CircleMarker(
-                        location=[row.geometry.y, row.geometry.x], 
-                        radius=5, 
-                        color="red",
-                        fill=True,
-                        fill_color="red",
-                        fill_opacity=0.7,
-                        popup=f"Point ID: {row.name}"
-                    ).add_to(marker_cluster)
-                    
-                marker_cluster.add_to(area_map)
-            else:
-                # For smaller datasets, use regular feature group
-                point_group = folium.FeatureGroup(name="Solar Points")
-                
-                # Add points within the drawn area
-                for _, row in intersecting.iterrows():
-                    folium.CircleMarker(
-                        location=[row.geometry.y, row.geometry.x], 
-                        radius=5, 
-                        color="red",
-                        fill=True,
-                        fill_color="red",
-                        fill_opacity=0.7,
-                        popup=f"Point ID: {row.name}"
-                    ).add_to(point_group)
-                
-                point_group.add_to(area_map)
-            
-            # Add layer control
-            folium.LayerControl().add_to(area_map)
-            
-            # Display the map
-            folium_static(area_map)
+        st.subheader("🗺️ Interactive Map of Custom Area")
+        area_map = folium.Map(location=drawn_area["center"], zoom_start=10)
         
-        # # Display table of points
-        # st.subheader(f"📍 {len(intersecting)} Points Inside Custom Area")
-        # if not intersecting.empty:
-        #     display_cols = [col for col in intersecting.columns if col != 'geometry']
-        #     st.dataframe(intersecting[display_cols])
-        # else:
-        #     st.info("No points found within the drawn area.")
+        # Add the drawn polygon
+        drawn_gdf = gpd.GeoDataFrame([{"geometry": drawn_area["geometry"]}], crs="EPSG:4326")
+        folium.GeoJson(
+            drawn_gdf,
+            name="Custom Area",
+            style_function=lambda x: {"color": "#ff7800", "fillColor": "#ffff00", "weight": 2, "fillOpacity": 0.2}
+        ).add_to(area_map)
+        
+        # Use marker cluster for large datasets to improve performance
+        use_clustering = len(intersecting) > 100
+        
+        if use_clustering:
+            # Create marker cluster
+            marker_cluster = MarkerCluster(name="Solar Points (Clustered)")
+            
+            # Add points within the drawn area to cluster
+            for _, row in intersecting.iterrows():
+                folium.CircleMarker(
+                    location=[row.geometry.y, row.geometry.x], 
+                    radius=5, 
+                    color="red",
+                    fill=True,
+                    fill_color="red",
+                    fill_opacity=0.7,
+                    popup=f"Point ID: {row.name}"
+                ).add_to(marker_cluster)
+                
+            marker_cluster.add_to(area_map)
+        else:
+            # For smaller datasets, use regular feature group
+            point_group = folium.FeatureGroup(name="Solar Points")
+            
+            # Add points within the drawn area
+            for _, row in intersecting.iterrows():
+                folium.CircleMarker(
+                    location=[row.geometry.y, row.geometry.x], 
+                    radius=5, 
+                    color="red",
+                    fill=True,
+                    fill_color="red",
+                    fill_opacity=0.7,
+                    popup=f"Point ID: {row.name}"
+                ).add_to(point_group)
+            
+            point_group.add_to(area_map)
+        
+        # Add layer control
+        folium.LayerControl().add_to(area_map)
+        
+        # Display the map
+        folium_static(area_map)
+        
+        # Display table of points
+        st.subheader(f"📍 {len(intersecting)} Points Inside Custom Area")
+        if not intersecting.empty:
+            display_cols = [col for col in intersecting.columns if col != 'geometry']
+            st.dataframe(intersecting[display_cols])
+        else:
+            st.info("No points found within the drawn area.")
     else:
-        st.info(" Draw a rectangle on the map using the rectangle tool. The area will be analyzed automatically.")
-
-    #list of cooridnate tuples
-
-    custom_coords = list(zip(intersecting['lat'], intersecting['lon']))
+        st.info("👆 Draw a rectangle on the map using the rectangle tool. The area will be analyzed automatically.")
 # First define once at the top
 @st.cache_data
 def convert_df_to_csv(_df):
@@ -963,14 +799,14 @@ if st.session_state.selection_mode == "municipality" and st.session_state.select
     if not selected_gdf.empty:
         selected_geom = selected_gdf.geometry.unary_union
         intersecting = gdf_points[gdf_points.geometry.within(selected_geom)]
-        # if not intersecting.empty:
-        #     csv = convert_df_to_csv(intersecting)
-        #     st.download_button(
-        #         label="Download points as CSV",
-        #         data=csv,
-        #         file_name=f"{st.session_state.selected_muni}_points.csv",
-        #         mime='text/csv',
-        #     )
+        if not intersecting.empty:
+            csv = convert_df_to_csv(intersecting)
+            st.download_button(
+                label="Download points as CSV",
+                data=csv,
+                file_name=f"{st.session_state.selected_muni}_points.csv",
+                mime='text/csv',
+            )
 
 elif st.session_state.selection_mode == "draw" and st.session_state.drawn_area:
     try:
@@ -1014,41 +850,6 @@ def connect_to_db():  # utilized
     st.text("Database connection failed:")
 
     return None 
-  
-def filter_slope(valid_points, slope_constraint = 0):
-    ''' call this function to filter out '''
-
-    working_db = connect_to_db()
-    while working_db == None:
-      working_db = connect_to_db()
-
-  #this will allow the sql queries
-    pointer = working_db.cursor()
-
-    prep_points = ', '.join(['(%s, %s)'] * len(valid_points))
-    coords = [coord for point in valid_points for coord in point]
-
-    query = f"""SELECT lon, lat
-     FROM "Slope_Percentage"
-     WHERE "slope_rounded" <= {slope_constraint}  AND (lon_rounded, lat_rounded) IN ({prep_points});"""
-    
-    pointer.execute(query, coords)
-
-    slope_data = pointer.fetchall()
-
-    #clean data
-    temp_holder = []
-    for point in slope_data:
-      new = (round(float(point[0]), 6), round(float(point[1]), 6))
-      temp_holder.append(new)
-    
-    slope_data = temp_holder
-
-
-    pointer.close()
-    working_db.close()
-
-    return slope_data 
 
 
 
@@ -1091,6 +892,13 @@ def db_fetch_hourly_solar(valid_points:list, municipality = None):
 
     pointer.execute(query, coords)
 
+    solar_data = pointer.fetchall()
+
+    pointer.close()
+    working_db.close()
+
+    return solar_data
+  
   else:
     query = f"""SELECT latitude, longitude, "Year", "Month", "Day", "Hour", "GHI", "municipality"
     FROM "NSRDB_SOLAR"
@@ -1098,14 +906,14 @@ def db_fetch_hourly_solar(valid_points:list, municipality = None):
     AND (lon_rounded, lat_rounded) IN ({prep_points})
     ORDER BY "Month" ASC, "Day" ASC, "Hour" ASC;"""
 
-  pointer.execute(query, coords)
+    pointer.execute(query, coords)
 
-  solar_data = pointer.fetchall()
+    solar_data = pointer.fetchall()
 
-  pointer.close()
-  working_db.close()
+    pointer.close()
+    working_db.close()
 
-  return solar_data
+    return solar_data
   
 def db_fetch_IRENA_solar(valid_points:list, municipality = None):
   """ returns in this format:           longitude (xcoord) | latitude (ycoord) | jan ghi | ... | dec ghi | municipality
@@ -1162,11 +970,8 @@ monthly_ghi_data = [] # IRENA monthly ghi data
 
 
 with col1:
-    #rearrange and then round off to match with SQL database
+#rearrange and then round off to match with SQL database
     temp_points =[]
-    if st.session_state.selection_mode != "municipality":
-        coordinate_tuples = custom_coords
-
     for tup in coordinate_tuples:
         new_tup = (round(tup[1],6), round(tup[0],6))
         temp_points.append(new_tup)
@@ -1180,16 +985,8 @@ with col1:
             # st.write(f"filtered points: {valid_points}")
 
     else:
-        # st.write(f"filtered points: No Constraint Selected. ")
+            # st.write(f"filtered points: No Constraint Selected. ")
         valid_points = temp_points
-
-    # st.write(f"unfiltered: {valid_points}")
-
-    if slope_checker:
-        valid_points = filter_slope(valid_points, slope)
-        # st.write(f"filtered slope {valid_points}")
-        if len(valid_points) == 0:
-            st.info("No results match your current selection criteria. ")
 
     st.markdown(f"""
         <div style="
@@ -1209,40 +1006,42 @@ with col1:
 
 def ave_ghi_nsrdb(solar_data): #NSRDB
     """
-    Compute the average GHI per hour for the given solar_data
-    and populate monthly GHI sums.
+    Compute the average GHI per hour and store in munip_hourly_list.
     """
-    # Debug the first entry to understand the data structure
+    ghi_hourly = [entry[6] for entry in solar_data]  # Extract hourly GHI column (index 8)
+    average_ghi = sum(ghi_hourly) / len(ghi_hourly)  # Compute average GHI
+    munip_hourly_list.append(average_ghi)  # Store in the list
+
+    sum_months = [0] * 12  # List to hold GHI sums for each month
+
+    # Define the hourly index range for each month in 2017
+    month_ranges = [
+        (0, 744),   # January
+        (744, 1416),  # February
+        (1416, 2160), # March
+        (2160, 2880), # April
+        (2880, 3624), # May
+        (3624, 4344), # June
+        (4344, 5088), # July
+        (5088, 5832), # August
+        (5832, 6552), # September
+        (6552, 7296), # October
+        (7296, 8016), # November
+        (8016, 8760)  # December
+    ]
+
+    # Iterate over hour-based GHI values and sum them into months
+    for month_index, (start, end) in enumerate(month_ranges):
+        sum_months[month_index] = sum(munip_hourly_list[start:end])
     
-    sum_months = [0] * 12
-    
-    # Group and sum GHI values by month
-    for entry in solar_data:
-        month = entry[3]
-        ghi = entry[6]    
-        
-        sum_months[month - 1] += ghi
-    
-    #st.write(f"Monthly NSRDB GHI sums: {sum_months}")
     return sum_months
 
 def IRENA_monthly_ghi(solar_data): #IRENA
-    # Initialize the list here
-    monthly_ghi_data = []
-    
-    for i in range(2, 14):
-        # Create a tuple of values for this month from all entries
-        month_data = tuple(entry[i] for entry in solar_data)
-        monthly_sum = sum(month_data)*1000
-        monthly_ghi_data.append(monthly_sum)
-    
-    # Display the data in Streamlit (if using Streamlit)
-    #st.write(f"Monthly IRENA GHI sums: {monthly_ghi_data}")
+    monthly_ghi_data.extend([tuple(entry[i] for entry in solar_data) for i in range(2, 14)])
     return monthly_ghi_data
 
-
-# NSRDB Monthly Energy Yield function
-def NSRDB_monthly_energy_yield(af, eta, sum_months, area=9, pixel_num=0): #NSRDB
+#MONTHLY ENERGY YIELD
+def NSRDB_monthly_energy_yield(sum_months, area=9, af=0.7, eta=0.2): #NSRDB
     """
     Compute Monthly Energy Yield (MEY) for each month using total GHI.
     """
@@ -1251,20 +1050,21 @@ def NSRDB_monthly_energy_yield(af, eta, sum_months, area=9, pixel_num=0): #NSRDB
         MEY = (ghi_sum * area * pixel_num * af * eta) # Converted to MWh
         mey_list_nsrdb.append(MEY)
         
-    annual_energy_yield_nsrdb = sum(mey_list_nsrdb)
+        annual_energy_yield_nsrdb = sum(mey_list_nsrdb)
 
     return mey_list_nsrdb, annual_energy_yield_nsrdb
 
-
-
-# IRENA Monthly Energy Yield function
-def IRENA_monthly_energy_yield(af, eta, monthly_ghi_data, valid_points, area=9): #IRENA
+def IRENA_monthly_energy_yield(monthly_ghi_data, valid_points, area=9, af=0.7, eta=0.2): #IRENA
+    """
+    Compute Monthly Energy Yield (MEY) for each month using total GHI.
+    """
     mey_list_irena = []
     for month_ghi in monthly_ghi_data:
-        # month_ghi is already a sum, so don't try to sum it again
-        MEY = (month_ghi * area * len(valid_points) * af * eta) # Convert to MWh
+        ghi_sum = sum(month_ghi)  # Compute total GHI for the month
+        MEY = (ghi_sum * area * len(valid_points) * af * eta)/1000 # Convert to MWh
         mey_list_irena.append(MEY)
     
+
     annual_energy_yield_irena = sum(mey_list_irena)
 
     return mey_list_irena, annual_energy_yield_irena
@@ -1283,27 +1083,17 @@ def IRENA_monthly_energy_yield(af, eta, monthly_ghi_data, valid_points, area=9):
     - solar_noon_hours (dict): Dictionary with dates as keys and rounded solar noon hour (local time) as values.
     """
 #-------------------------------------------------------------------------------------------------------
-def monthlyGHI(latitude, longitude):
-    """
-    Calculate solar noon hours for a given latitude and longitude for the year 2017.
-    
-    Parameters:
-    - latitude: float - latitude coordinate
-    - longitude: float - longitude coordinate
-    
-    Returns:
-    - Dictionary mapping dates to solar noon hours
-    """
+#COMPUTING FOR NSRDB POWER DENSITY
+def monthlyGHI(latitude, longitude, year):
     observer = ephem.Observer()
     observer.lat, observer.lon = str(latitude), str(longitude)
     observer.elev = 0  # Assume sea level
 
     solar_noon_hours = {}  # Store results
-    # 2017 is not a leap year, so it has 365 days
-    days_in_year = 365
+    days_in_year = 366 if calendar.isleap(year) else 365
 
     for day in range(1, days_in_year + 1):
-        date = datetime(2017, 1, 1) + timedelta(days=day - 1)
+        date = datetime(year, 1, 1) + timedelta(days=day - 1)
         observer.date = date.strftime("%Y/%m/%d")
         solar_noon = observer.next_transit(ephem.Sun(), start=observer.date)
         solar_noon_local = ephem.localtime(solar_noon)
@@ -1314,56 +1104,26 @@ def monthlyGHI(latitude, longitude):
     return solar_noon_hours
 
 def highest_GHI_at_solar_noon(solar_data):
-    """
-    Find the highest GHI value at solar noon for the entire year 2017 from the provided solar data.
-    
-    Parameters:
-    - solar_data: list of tuples in format (latitude, longitude, year, month, day, hour, ghi, location_name)
-    
-    Returns:
-    - max_ghi: float - the highest GHI value at solar noon for the entire year
-    """
     max_ghi = 0
-    solar_noon_cache = {}  # Cache to avoid recalculating for same coordinates
     
     for entry in solar_data:
-        # Extract the values from your tuple format
-        latitude, longitude, year, month, day, hour, ghi, location_name = entry
-        
-        # Convert values to correct types
-        latitude = float(latitude)
-        longitude = float(longitude)
-        month = int(month)
-        day = int(day)
-        hour = int(hour)
-        ghi = float(ghi)
-        
-        # Since we know it's always 2017, we can simplify the cache key
-        location_key = (latitude, longitude)
-        
-        # Calculate solar noon hours if not already in cache
-        if location_key not in solar_noon_cache:
-            solar_noon_cache[location_key] = monthlyGHI(latitude, longitude)
-        
-        solar_noon_hours = solar_noon_cache[location_key]
-        date_key = f"2017-{month:02d}-{day:02d}"
+        unique_id, lat, lon, year, month, day, hour, _, ghi, *_ = entry
+        solar_noon_hours = monthlyGHI(lat, lon, year)
+        date_key = f"{year}-{month:02d}-{day:02d}"
         
         if date_key in solar_noon_hours and hour == solar_noon_hours[date_key]:
-            if ghi > max_ghi:
-                max_ghi = ghi
+            max_ghi = max(max_ghi, ghi)
     
     return max_ghi
-#-------------------------------------------------------------------------------------------------------
 
 #SOLAR CAPACITY
 def NSRDB_capacity(power_density, area=9):
-    cap_nsrdb = (area * power_density * len(valid_points))
-    #st.write(f"power density nsrdb: {power_density}")
+    cap_nsrdb = (area * power_density * 3000) / 1000000
     return cap_nsrdb
 
 
-def IRENA_capacity (power_density=1000, area=9):
-    cap_irena = (area * power_density * len(valid_points))
+def IRENA_capacity (valid_points, power_density=1000, area=9):
+    cap_irena = (area * power_density * len(valid_points))/1000000
     return cap_irena
 #-------------------------------------------------------------------------------------------------------
 #SOLAR_CAPACITY_FACTOR
@@ -1371,25 +1131,12 @@ days_in_month = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 hours_in_month = [days * 24 for days in days_in_month]
 
 def NSRDB_capacity_factor(cap_nsrdb, mey_list_nsrdb): #NSRDB
-    print(f"cap_nsrdb: {cap_nsrdb}")
-    print(f"mey_list_nsrdb: {mey_list_nsrdb}")
-    print(f"hours_in_month: {hours_in_month}")
-    
     cf_list_nsrdb = []
     cf_percentage_list_nsrdb = []
     
-    for i, (month, hours) in enumerate(zip(mey_list_nsrdb, hours_in_month)):
-        print(f"Month {i+1}: month={month}, hours={hours}")
-        
-        # Check for zero division
-        if cap_nsrdb == 0 or hours == 0:
-            print(f"Warning: Division by zero detected in month {i+1}. cap_nsrdb={cap_nsrdb}, hours={hours}")
-            capacity_factor_nsrdb = 0  # Set to zero or another appropriate default
-            cf_percentage_nsrdb = 0
-        else:
-            capacity_factor_nsrdb = month / (cap_nsrdb * hours)
-            cf_percentage_nsrdb = capacity_factor_nsrdb*100
-        
+    for month, hours in zip(mey_list_nsrdb, hours_in_month):
+        capacity_factor_nsrdb = month / (cap_nsrdb * hours)
+        cf_percentage_nsrdb = capacity_factor_nsrdb 
         cf_list_nsrdb.append(capacity_factor_nsrdb)
         cf_percentage_list_nsrdb.append(cf_percentage_nsrdb)
     
@@ -1401,7 +1148,7 @@ def IRENA_capacity_factor(cap_irena, mey_list_irena):
     
     for month, hours in zip(mey_list_irena, hours_in_month):
         capacity_factor_irena = month / (cap_irena * hours)
-        cf_percentage_irena = capacity_factor_irena*100
+        cf_percentage_irena = capacity_factor_irena 
         cf_list_irena.append(capacity_factor_irena)
         cf_percentage_list_irena.append(cf_percentage_irena)
     
@@ -1418,7 +1165,7 @@ def NSRDB_lcoe(cf_list_nsrdb, fixed_charge_rate=0.092, capital_cost=75911092, fi
             lcoe_list_nsrdb.append(float('inf'))  # Avoid division by zero
         else:
             denominator = cf * hours
-            lcoe_value_nsrdb = (((fixed_charge_rate * capital_cost + fixed_om_cost) / denominator) + variable_om_cost + fuel_cost) 
+            lcoe_value_nsrdb = (((fixed_charge_rate * capital_cost + fixed_om_cost) / denominator) + variable_om_cost + fuel_cost) / 1000
             lcoe_list_nsrdb.append(lcoe_value_nsrdb)
     
     return lcoe_list_nsrdb
@@ -1431,7 +1178,7 @@ def IRENA_lcoe(cf_list_irena, fixed_charge_rate=0.092, capital_cost=75911092, fi
             lcoe_list_irena.append(float('inf'))  # Avoid division by zero
         else:
             denominator = cf * hours
-            lcoe_value_irena = (((fixed_charge_rate * capital_cost + fixed_om_cost) / denominator) + variable_om_cost + fuel_cost) 
+            lcoe_value_irena = (((fixed_charge_rate * capital_cost + fixed_om_cost) / denominator) + variable_om_cost + fuel_cost) / 1000
             lcoe_list_irena.append(lcoe_value_irena)
     
     return lcoe_list_irena
@@ -1523,255 +1270,44 @@ if choose_from:
 
   valid_points = look_up_points(temp_points, choose_from)
 
+  st.write(f"all of the points: {temp_points}")
+  st.write(f"filtered points: {valid_points}")
+
 else:
-  #st.write(f"filtered points: No Constraint Selected. ")
+  st.write(f"filtered points: No Constraint Selected. ")
   valid_points = temp_points
 
-holder = []
-for point in valid_points:
-    new = (point[1], point[0])
-    holder.append(new)
-
-# valid_points = holder
-
-#Data Visualization
-def plot_monthly_value(IRENA: list, NSRDB: list, IRENA_cf: list, NSRDB_cf, IRENA_lcoe, NSRDB_lcoe):
-    months = [
-        "Jan", "Feb", "Mar", "Apr", "May", "June",
-        "July", "Aug", "Sep", "Oct", "Nov", "Dec"
-    ]
-
-    energy_df = pd.DataFrame({
-        "Month": months,
-        "Energy Yield (IRENA)" : IRENA,
-        "Energy Yield (NSRDB)" : NSRDB
-    })
-
-    capacity_df = pd.DataFrame({
-        "Month": months,
-        "Capacity Factor (IRENA)": IRENA_cf,
-        "Capacity Factor (NSRDB)": NSRDB_cf
-    })
-
-    lcoe_df = pd.DataFrame({
-        "Month": months,
-        "LCOE (IRENA)": IRENA_lcoe,
-        "LCOE (NSRDB)": NSRDB_lcoe
-    })
-
-    
-    
-    fig1 = px.bar(
-        energy_df,
-        x='Month',
-        y=['Energy Yield (IRENA)', 'Energy Yield (NSRDB)'],
-        barmode='group',
-        title="Monthly Energy Yield (WH)",
-        color_discrete_sequence=['#FFD63A', '#FFA955']  # Change color palette here
-    )
-  
-    
-    fig2 = px.bar(
-        capacity_df, x='Month', 
-        y=['Capacity Factor (IRENA)', 'Capacity Factor (NSRDB)'], 
-        barmode='group', title="Monthly Capacity Factor (%)",
-        color_discrete_sequence=['#67AE6E', '#90C67C']
-    )
-
-    
-    fig3 = px.bar(
-        lcoe_df, x='Month', 
-        y=['LCOE (IRENA)', 'LCOE (NSRDB)'], 
-        barmode='group', title="Monthly LCOE (₱)",
-        color_discrete_sequence=['#3D90D7', '#7AC6D2']
-    )
-
-    return fig1, fig2, fig3
-    
-
-
-#st.write(f"all of the points: {temp_points}")
-#st.write(f"filtered points: {valid_points}")
 #call functions here
 
 irena_solar_data = db_fetch_IRENA_solar(valid_points)
-#st.write(f"this is irena: {irena_solar_data}")
-
 nsrdb_solar_data = db_fetch_hourly_solar(valid_points)
-#st.write(f"this is nsrdb: {nsrdb_solar_data[0]} and {nsrdb_solar_data[1]}")
 
 monthly_ghi_data = IRENA_monthly_ghi(irena_solar_data)
 
-mey_list_irena, annual_energy_yield_irena = IRENA_monthly_energy_yield(af, eta, monthly_ghi_data, valid_points, area=9)
-cap_irena = IRENA_capacity (power_density=1000, area=9)
+mey_list_irena, annual_energy_yield_irena = IRENA_monthly_energy_yield(monthly_ghi_data, valid_points, area=9, af=0.7, eta=0.2)
+cap_irena = IRENA_capacity (valid_points,power_density=1000, area=9)
 cf_list_irena, cf_percentage_list_irena = IRENA_capacity_factor(cap_irena, mey_list_irena)
 lcoe_list_irena = IRENA_lcoe(cf_list_irena)
 
 solar_data = [()]
-sum_months = ave_ghi_nsrdb(nsrdb_solar_data)
-mey_list_nsrdb, annual_energy_yield_nsrdb = NSRDB_monthly_energy_yield(af, eta,sum_months, area=9, pixel_num = len(valid_points))
-power_density = highest_GHI_at_solar_noon(nsrdb_solar_data)
-cap_nsrdb = NSRDB_capacity (power_density, area=9)
-cf_list_nsrdb, cf_percentage_list_nsrdb = NSRDB_capacity_factor(cap_nsrdb, mey_list_nsrdb)
-lcoe_list_nsrdb = NSRDB_lcoe(cf_list_nsrdb)
-
-# st.write(f"MEY list irena: {mey_list_irena}, annual energy yield irena: {annual_energy_yield_irena}")
-# st.write(f"cap irena: {cap_irena}")
-# st.write(f"cf list: {cf_list_irena}, cf percent: {cf_percentage_list_irena}")
-# st.write(f"lcoe list irena: {lcoe_list_irena}")
-
-# st.write(f"MEY list nsrdb: {mey_list_nsrdb}, annual energy yield nsrdb: {annual_energy_yield_nsrdb}")
-# st.write(f"cap nsrdb: {cap_nsrdb}")
-# st.write(f"cf list nsrdb: {cf_list_nsrdb}, cf percent nsrdb: {cf_percentage_list_nsrdb}")
-# st.write(f"lcoe list nsrdb: {lcoe_list_nsrdb}")
-
-eyield, cfactor, lcoee = plot_monthly_value(mey_list_irena, mey_list_nsrdb, cf_percentage_list_irena, cf_percentage_list_nsrdb,lcoe_list_irena, lcoe_list_nsrdb)
-st.write(f'mey irena: {mey_list_irena}')
-st.write(f'mey nsrdb: {mey_list_nsrdb}')
-st.write(f'cf_list_irena: {cf_percentage_list_irena}')
-st.write(f'cf_list_nsrdb: {cf_percentage_list_nsrdb}')
-st.write(f'lcoe_nsrdb: {lcoe_list_nsrdb}')
-st.write(f'lcoe_irena: {lcoe_list_irena}')
-with disp1:
-    st.plotly_chart(eyield)
-
-with disp2:
-    st.plotly_chart(cfactor)
-
-with disp3:
-    st.plotly_chart(lcoee)
-
-ave_yield_irena = annual_energy_yield_irena/12
-ave_yield_nsrdb = annual_energy_yield_nsrdb/12
-ave_lcoe_irena = sum(lcoe_list_irena)/12
-ave_lcoe_nsrdb = sum(lcoe_list_nsrdb)/12
+sum_months = ave_ghi_nsrdb(solar_data)
+mey_list_irena, annual_energy_yield_irena = NSRDB_monthly_energy_yield(sum_months, area=9, af=0.7, eta=0.2)
+cap_irena = IRENA_capacity (len(valid_points),power_density=1000, area=9)
+cf_list_irena, cf_percentage_list_irena = IRENA_capacity_factor(cap_irena, mey_list_irena)
+lcoe_list_irena = IRENA_lcoe(cf_list_irena)
+solar_noon_hours = monthlyGHI()
 
 
-with summary:
-    st.markdown(f"""
-        <style>
-            .metric-container {{
-                background-color: #ffffff;
-                border-radius: 5px;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                margin-bottom: 8px;
-                overflow: hidden;
-            }}
-            .metric-header {{
-                background-color: #F75A5A;
-                padding: 8px;
-                text-align: center;
-            }}
-            .metric-title {{
-                font-size: 20px;
-                font-weight: bold;
-                color: white !important;
-                margin: 0;
-            }}
-            .metric-content {{
-                display: flex;
-                padding: 8px;
-            }}
-            .icon-container {{
-                flex: 0 0 80px;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-            }}
-            .icon {{
-                width: 80px;
-                height: 80px;
-            }}
-            .data-container {{
-                flex: 1;
-                padding-left: 10px;
-            }}
-            .data-row {{
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-bottom: 5px;
-            }}
-            .source-label {{
-                font-size: 17px;
-                font-weight: bold;
-                color: #000;
-                flex: 0 0 80px;
-            }}
-            .value {{
-                font-size: 18px;
-                font-weight: normal;
-                color: #000;
-                text-align: right;
-                flex: 1;
-            }}
-        </style>
-        
-        <!-- Capacity -->
-        <div class="metric-container">
-            <div class="metric-header">
-                <h2 class="metric-title">CAPACITY</h2>
-            </div>
-            <div class="metric-content">
-                <div class="icon-container">
-                    <img src="https://raw.githubusercontent.com/yelsha07/icons/refs/heads/main/1.png" class="icon" />
-                </div>
-                <div class="data-container">
-                    <div class="data-row">
-                        <div class="source-label">IRENA</div>
-                        <div class="value">{round((cap_irena), 3)} MW</div>
-                    </div>
-                    <div class="data-row">
-                        <div class="source-label">NSRDB</div>
-                        <div class="value">{round((cap_nsrdb), 3)} MW</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Energy Yield -->
-        <div class="metric-container">
-            <div class="metric-header">
-                <h2 class="metric-title">AVE. ENERGY YIELD</h2>
-            </div>
-            <div class="metric-content">
-                <div class="icon-container">
-                    <img src="https://raw.githubusercontent.com/yelsha07/icons/refs/heads/main/2.png" class="icon" />
-                </div>
-                <div class="data-container">
-                    <div class="data-row">
-                        <div class="source-label">IRENA</div>
-                        <div class="value">{round((ave_yield_irena), 3)} MWh</div>
-                    </div>
-                    <div class="data-row">
-                        <div class="source-label">NSRDB</div>
-                        <div class="value">{round((ave_yield_nsrdb), 3)} MWh</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- LCOE -->
-        <div class="metric-container">
-            <div class="metric-header">
-                <h2 class="metric-title">AVE. LCOE</h2>
-            </div>
-            <div class="metric-content">
-                <div class="icon-container">
-                    <img src="https://raw.githubusercontent.com/yelsha07/icons/refs/heads/main/3.png" class="icon" />
-                </div>
-                <div class="data-container">
-                    <div class="data-row">
-                        <div class="source-label">IRENA</div>
-                        <div class="value">₱{round((ave_lcoe_irena), 3)}/MWh</div>
-                    </div>
-                    <div class="data-row">
-                        <div class="source-label">NSRDB</div>
-                        <div class="value">₱{round((ave_lcoe_nsrdb), 3)}/MWh</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+st.write(f"MEY list irena: {mey_list_irena}, annual energy yield irena: {annual_energy_yield_irena}")
+st.write(f"cap irena: {cap_irena}")
+st.write(f"cf list: {cf_list_irena}, cf percent: {cf_percentage_list_irena}")
+st.write(f"lcoe list irena: {lcoe_list_irena}")
 
-    #updated database
+
+# st.write(valid_points)
+# st.write(str(irena_solar_data)
+
+st.write(mey_list_irena, annual_energy_yield_irena)
+st.write(cap_irena)
+st.write(cf_list_irena, cf_percentage_list_irena)
+st.write(lcoe_list_irena)
