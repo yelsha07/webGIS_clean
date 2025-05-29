@@ -13,7 +13,7 @@ import math
 import statistics
 import plotly.express as px
 import json
-import others.solar_algo as solar
+import others.dump.solar_algo as solar
 import sys
 
 # # Database connection function
@@ -115,10 +115,10 @@ def db_fetch_hourly_solar(valid_points:list, municipality = None):
     return solar_data
   
   else:
-    query = f"""SELECT latitude, longitude, "Year", "Month", "Day", "Hour", "GHI", "municipality"
+    query = f"""SELECT longitude, latitude, "Year", "Month", "Day", "Hour", "GHI", "municipality"
     FROM "NSRDB_SOLAR"
     WHERE municipality = {municipality}
-    AND (ROUND(longitude::NUMERIC, 6), ROUND(latitude::NUMERIC, 6)) IN ({prep_points})
+    AND (ROUND(lat_rounded::NUMERIC, 6), ROUND(lon_rounded::NUMERIC, 6)) IN ({prep_points})
     ORDER BY "Month" ASC, "Day" ASC, "Hour" ASC;"""
 
     pointer.execute(query, coords)
@@ -262,7 +262,9 @@ def IRENA_monthly_energy_yield(monthly_ghi_data, pixel_num, area=9, af=0.7, eta=
     """
 #-------------------------------------------------------------------------------------------------------
 #COMPUTING FOR NSRDB POWER DENSITY
-def monthlyGHI(latitude, longitude, year):
+def monthlyGHI(solar_data, year):
+    latitude = [entry[0] for entry in solar_data]
+    longitude = [entry[1] for entry in solar_data]
     observer = ephem.Observer()
     observer.lat, observer.lon = str(latitude), str(longitude)
     observer.elev = 0  # Assume sea level
@@ -293,6 +295,41 @@ def highest_GHI_at_solar_noon(solar_data):
             max_ghi = max(max_ghi, ghi)
     
     return max_ghi
+
+def filter_slope(valid_points, slope_constraint = 0):
+    ''' call this function to filter out '''
+
+    working_db = connect_to_db()
+    while working_db == None:
+      working_db = connect_to_db()
+
+  #this will allow the sql queries
+    pointer = working_db.cursor()
+
+    prep_points = ', '.join(['(%s, %s)'] * len(valid_points))
+    coords = [coord for point in valid_points for coord in point]
+
+    query = f"""SELECT lon, lat
+     FROM "Slope_Percentage"
+     WHERE "slope_rounded" <= {slope_constraint}  AND (lon_rounded, lat_rounded) IN ({prep_points});"""
+    
+    pointer.execute(query, coords)
+
+    slope_data = pointer.fetchall()
+
+    #clean data
+    temp_holder = []
+    for point in slope_data:
+      new = (round(float(point[0]), 6), round(float(point[1]), 6))
+      temp_holder.append(new)
+    
+    slope_data = temp_holder
+
+
+    pointer.close()
+    working_db.close()
+
+    return slope_data
 
 #SOLAR CAPACITY
 def NSRDB_capacity(power_density, area=9):
@@ -361,7 +398,7 @@ def IRENA_lcoe(cf_list_irena, fixed_charge_rate=0.092, capital_cost=75911092, fi
     
     return lcoe_list_irena
 
-def plot_monthly_value(IRENA: list, NSRDB: list, IRENA_cf: list, NSRDB_cf, capacity, IRENA_lcoe, NSRDB_lcoe):
+def plot_monthly_value(IRENA: list, NSRDB: list, IRENA_cf: list, NSRDB_cf, IRENA_lcoe, NSRDB_lcoe):
     months = [
         "Jan", "Feb", "Mar", "Apr", "May", "June",
         "July", "Aug", "Sep", "Oct", "Nov", "Dec"

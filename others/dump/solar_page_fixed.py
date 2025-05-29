@@ -30,6 +30,7 @@ import statistics
 import plotly.express as px
 import json
 
+import others.solar_algo_new as solar
 import sys
 
 
@@ -37,22 +38,13 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
-import others.solar_algo_new as solar
-
-
 # Set page config
-<<<<<<< HEAD
 st.set_page_config(layout="wide", page_title="Philippine Solar Potential Assessment")
 st.markdown("""
     <h1 style='text-align: center;'>
         Solar Potential Assessment
     </h1>
 """, unsafe_allow_html=True)
-=======
-st.set_page_config(layout="wide", page_title="Philippine Solar Energy Potential Assessment")
-
-st.title("Solar Potential Assessment")
->>>>>>> 041e7b1e4e0add571bf32715b874e22c3b73cbd8
 st.markdown("Select a municipality, or draw a custom area (minimum 3km x 3km) to assess solar potential.")
 
 # --- Static file paths --- 
@@ -452,13 +444,11 @@ if st.session_state.selection_mode == "municipality":
                 
                     
 
-        # let user choose the slope restrictions
-        # let user choose the slope restrictions
+ # let user choose the slope restrictions
         slope_checker = st.checkbox("Do you wish to apply slope limits?")
         if slope_checker:
             slope = st.number_input("Enter a value (in %) to filter out slope of the land", min_value=None, max_value=None, value=5.00, step= 0.01, format ="%.4f")
 
-        #af and eta slider
         af = st.slider(
             "Area Factor (af)", 
             min_value=0.0, 
@@ -598,7 +588,7 @@ if st.session_state.selection_mode == "municipality":
         st.stop()
 
     # Display the selected municipality
-    # st.subheader(f"Selected Municipality: {st.session_state.selected_muni}")
+    st.subheader(f"Selected Municipality: {st.session_state.selected_muni}")
 
     # --- Geo selection ---
     selected_gdf = gdf_municipalities[gdf_municipalities[municipality_name_col] == st.session_state.selected_muni]
@@ -639,7 +629,7 @@ if st.session_state.selection_mode == "municipality":
         area_km2 = width_km * height_km
 
 
-    metric, graphs  = st.columns(2)
+
     # Display municipality metrics
     st.markdown("""
     <div style="
@@ -655,19 +645,8 @@ if st.session_state.selection_mode == "municipality":
         Municipality Information
     </div>
 """, unsafe_allow_html=True)
-<<<<<<< HEAD
     c1, c2 = st.columns(2)
     disp1, disp2, disp3 = st.columns([1,1,1])
-=======
-
-    col_metric1, col_metric2 = st.columns([1,2])
-    #c1, c2 = st.columns(2)
-    #c1.metric("Area", f"{area_km2:.2f} km²")
-    #c2.metric("Points within Municipality", f"{len(intersecting)}")
-
-    disp1, disp2, disp3 = st.columns([1,1,1])
-
->>>>>>> 041e7b1e4e0add571bf32715b874e22c3b73cbd8
     interactive, summary = st.columns([2,1])
     # --- Map ---
     with interactive:
@@ -743,21 +722,12 @@ if st.session_state.selection_mode == "municipality":
         folium_static(m)
 
     # --- Table of points ---
-<<<<<<< HEAD
     # st.subheader(f"📍 {len(intersecting)} Points Inside {st.session_state.selected_muni}")
     # if not intersecting.empty:
     #     display_cols = [col for col in intersecting.columns if col != 'geometry']
     #     st.dataframe(intersecting[display_cols])
     # else:
     #     st.info("No points found within this municipality.")
-=======
-    #st.subheader(f"📍 {len(intersecting)} Points Inside {st.session_state.selected_muni}")
-    #if not intersecting.empty:
-    #    display_cols = [col for col in intersecting.columns if col != 'geometry']
-    #    st.dataframe(intersecting[display_cols])
-    #else:
-    #    st.info("No points found within this municipality.")
->>>>>>> 041e7b1e4e0add571bf32715b874e22c3b73cbd8
 
 else:  # Draw Custom Area mode
     with col1:
@@ -781,7 +751,6 @@ else:  # Draw Custom Area mode
             # # Reset map click source flag after dropdown handling
             # st.session_state.map_click_source = False
         
-<<<<<<< HEAD
             # col_metric1, col_metric2 = st.columns(2)
 
 
@@ -812,12 +781,10 @@ else:  # Draw Custom Area mode
                         choose_from.append(constraints_table[3])
 
             # let user choose the slope restrictions
-            # let user choose the slope restrictions
             slope_checker = st.checkbox("Do you wish to apply slope limits?")
             if slope_checker:
-                slope = st.number_input("Enter a value (in %) to filter out slope of the land", min_value=None, max_value=None, value=5.00, step= 0.01, format ="%.4f")
+                slope = st.number_input("Enter a value (in %) to filter out slope of the land", min_value=None, max_value=None, value=20.00, step= 0.01, format ="%.4f")
 
-                    #af and eta slider
             af = st.slider(
                 "Area Factor (af)", 
                 min_value=0.0, 
@@ -836,59 +803,6 @@ else:  # Draw Custom Area mode
             )
 
 
-=======
-        # METRICS BELOW DRAWING INSTRUCTIONS
-        #st.markdown("### 📊 Dataset Information")
-        #col_metric1, col_metric2 = st.columns(2)
-        
-        # let user choose constraints first
-        st.write("Choose which constraints to apply.")
-
-        constraints_table = {0:"BuiltUp Constraints Removed", 1: "CADTs Constraints Removed", 2: "Forest Constraints Removed", 3: "Protected Areas Removed"}
-        choose_from = []
-
-        with st.container():
-            col1sub, col2sub = st.columns(2)
-
-            with col1sub:
-                ancestral = st.checkbox("Ancestral Domains")
-                if ancestral:
-                    choose_from.append(constraints_table[1])
-
-                tree_cover = st.checkbox("Tree Covers")
-                if tree_cover:
-                    choose_from.append(constraints_table[2])
-
-            with col2sub:
-                land_use = st.checkbox("Land Use")
-                if land_use:
-                    choose_from.append(constraints_table[0])
-                protected_areas =  st.checkbox("Protected Areas")
-                if protected_areas:
-                    choose_from.append(constraints_table[3])
-
-        
-
-        # let user choose the slope restrictions
-        slope = st.slider("Filter out slope of the land (%):", min_value=0.0, max_value=10.0, value=1.0, step=0.1)
-
-        st.markdown(f"""
-        <div style="
-            background-color: #ffffff;
-            padding: 20px;
-            border-radius: 15px;
-            text-align: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            font-size: 25px;
-            font-weight: bold;
-            color: #333;
-            ">
-            Total Area: {9 * len(valid_points)} km²
-        </div>
-        <br>
-    """, unsafe_allow_html=True)
-        
->>>>>>> 041e7b1e4e0add571bf32715b874e22c3b73cbd8
     with col2:
             # Create map with drawing tools
         try:
@@ -1043,14 +957,14 @@ if st.session_state.selection_mode == "municipality" and st.session_state.select
     if not selected_gdf.empty:
         selected_geom = selected_gdf.geometry.unary_union
         intersecting = gdf_points[gdf_points.geometry.within(selected_geom)]
-        # if not intersecting.empty:
-        #     csv = convert_df_to_csv(intersecting)
-        #     st.download_button(
-        #         label="Download points as CSV",
-        #         data=csv,
-        #         file_name=f"{st.session_state.selected_muni}_points.csv",
-        #         mime='text/csv',
-        #     )
+        if not intersecting.empty:
+            csv = convert_df_to_csv(intersecting)
+            st.download_button(
+                label="Download points as CSV",
+                data=csv,
+                file_name=f"{st.session_state.selected_muni}_points.csv",
+                mime='text/csv',
+            )
 
 elif st.session_state.selection_mode == "draw" and st.session_state.drawn_area:
     try:
@@ -1067,7 +981,6 @@ elif st.session_state.selection_mode == "draw" and st.session_state.drawn_area:
         st.error(f"Error preparing download: {e}")
 
 ###
-<<<<<<< HEAD
 # Database connection function
 def get_db_connection():
     return psycopg2.connect(
@@ -1095,41 +1008,6 @@ def connect_to_db():  # utilized
     st.text("Database connection failed:")
 
     return None 
-  
-def filter_slope(valid_points, slope_constraint = 0):
-    ''' call this function to filter out '''
-
-    working_db = connect_to_db()
-    while working_db == None:
-      working_db = connect_to_db()
-
-  #this will allow the sql queries
-    pointer = working_db.cursor()
-
-    prep_points = ', '.join(['(%s, %s)'] * len(valid_points))
-    coords = [coord for point in valid_points for coord in point]
-
-    query = f"""SELECT lon, lat
-     FROM "Slope_Percentage"
-     WHERE "slope_rounded" <= {slope_constraint}  AND (lon_rounded, lat_rounded) IN ({prep_points});"""
-    
-    pointer.execute(query, coords)
-
-    slope_data = pointer.fetchall()
-
-    #clean data
-    temp_holder = []
-    for point in slope_data:
-      new = (round(float(point[0]), 6), round(float(point[1]), 6))
-      temp_holder.append(new)
-    
-    slope_data = temp_holder
-
-
-    pointer.close()
-    working_db.close()
-
-    return slope_data 
 
 
 
@@ -1241,8 +1119,6 @@ sum_months = [] # NSRDB monthly ghi data
 monthly_ghi_data = [] # IRENA monthly ghi data
 
 
-=======
->>>>>>> 041e7b1e4e0add571bf32715b874e22c3b73cbd8
 
 with col1:
     #rearrange and then round off to match with SQL database
@@ -1263,16 +1139,8 @@ with col1:
             # st.write(f"filtered points: {valid_points}")
 
     else:
-        # st.write(f"filtered points: No Constraint Selected. ")
+            # st.write(f"filtered points: No Constraint Selected. ")
         valid_points = temp_points
-
-    # st.write(f"unfiltered: {valid_points}")
-
-    if slope_checker:
-        valid_points = filter_slope(valid_points, slope)
-        # st.write(f"filtered slope {valid_points}")
-        if len(valid_points) == 0:
-            st.info("No results match your current selection criteria. ")
 
     st.markdown(f"""
         <div style="
@@ -1290,7 +1158,6 @@ with col1:
         <br>
     """, unsafe_allow_html=True)
 
-<<<<<<< HEAD
 def ave_ghi_nsrdb(solar_data): #NSRDB
     """
     Compute the average GHI per hour for the given solar_data
@@ -1332,7 +1199,7 @@ def NSRDB_monthly_energy_yield(af, eta, sum_months, area=9, pixel_num=0): #NSRDB
     """
     mey_list_nsrdb = []
     for ghi_sum in sum_months:
-        MEY = (ghi_sum * area * pixel_num * af * eta) # Converted to MWh
+        MEY = (ghi_sum * area * pixel_num * af * eta)*1000 # Converted to MWh
         mey_list_nsrdb.append(MEY)
         
     annual_energy_yield_nsrdb = sum(mey_list_nsrdb)
@@ -1346,7 +1213,7 @@ def IRENA_monthly_energy_yield(af, eta, monthly_ghi_data, valid_points, area=9):
     mey_list_irena = []
     for month_ghi in monthly_ghi_data:
         # month_ghi is already a sum, so don't try to sum it again
-        MEY = (month_ghi * area * len(valid_points) * af * eta) # Convert to MWh
+        MEY = (month_ghi * area * len(valid_points) * af * eta)*1000 # Convert to MWh
         mey_list_irena.append(MEY)
     
     annual_energy_yield_irena = sum(mey_list_irena)
@@ -1441,13 +1308,13 @@ def highest_GHI_at_solar_noon(solar_data):
 
 #SOLAR CAPACITY
 def NSRDB_capacity(power_density, area=9):
-    cap_nsrdb = (area * power_density * len(valid_points))
+    cap_nsrdb = (area * power_density * len(valid_points))/1000000 
     #st.write(f"power density nsrdb: {power_density}")
     return cap_nsrdb
 
 
 def IRENA_capacity (power_density=1000, area=9):
-    cap_irena = (area * power_density * len(valid_points))
+    cap_irena = (area * power_density * len(valid_points))/1000000
     return cap_irena
 #-------------------------------------------------------------------------------------------------------
 #SOLAR_CAPACITY_FACTOR
@@ -1502,7 +1369,7 @@ def NSRDB_lcoe(cf_list_nsrdb, fixed_charge_rate=0.092, capital_cost=75911092, fi
             lcoe_list_nsrdb.append(float('inf'))  # Avoid division by zero
         else:
             denominator = cf * hours
-            lcoe_value_nsrdb = (((fixed_charge_rate * capital_cost + fixed_om_cost) / denominator) + variable_om_cost + fuel_cost) 
+            lcoe_value_nsrdb = (((fixed_charge_rate * capital_cost + fixed_om_cost) / denominator) + variable_om_cost + fuel_cost) / 1000
             lcoe_list_nsrdb.append(lcoe_value_nsrdb)
     
     return lcoe_list_nsrdb
@@ -1515,112 +1382,108 @@ def IRENA_lcoe(cf_list_irena, fixed_charge_rate=0.092, capital_cost=75911092, fi
             lcoe_list_irena.append(float('inf'))  # Avoid division by zero
         else:
             denominator = cf * hours
-            lcoe_value_irena = (((fixed_charge_rate * capital_cost + fixed_om_cost) / denominator) + variable_om_cost + fuel_cost) 
+            lcoe_value_irena = (((fixed_charge_rate * capital_cost + fixed_om_cost) / denominator) + variable_om_cost + fuel_cost) / 1000
             lcoe_list_irena.append(lcoe_value_irena)
     
     return lcoe_list_irena
-=======
-with col_metric1:
-    # #fetch irena and nsrdb again for the valid points
-    solar_data = solar.db_fetch_hourly_solar(valid_points:list, municipality = None)
-    final_solar_data = solar.db_fetch_IRENA(valid_points, municipality = None)
 
-    #fetch NSRDB spatial average
-    sum_months = solar.ave_ghi_nsrdb(solar_data)
+def obtain_municip(): # utilized
+  #establishes connection to the database first
+  #st.text("Trying to connect to database...")
+  working_db = connect_to_db()
+  while working_db == None:
+    working_db = connect_to_db()
 
-    #fetch IRENA monthly
-    monthly_ghi_data = solar.IRENA_monthly_ghi(final_solar_data)
+  #this will allow the sql queries
+  #st.text("Successful!")
+  pointer = working_db.cursor()
+  
+  
+  query = f'''SELECT DISTINCT adm3_en
+  FROM "IRENA_GHI_WS20_WS60 ";'''
 
-    # # initialize
+  pointer.execute(query)
+  municip_data = pointer.fetchall() 
 
-    NSRDB_monthly_energy_yield = []
-    IRENA_monthly_energy_yield = []
-    cf_list_nsrdb = []
-    cf_percentage_list_nsrdb = []
-    cf_list_irena = []
-    cf_percentage_list_irena = []
-    lcoe_list_nsrdb = []
-    lcoe_list_irena = []
+  pointer.close()
+  working_db.close()
+
+
+  return municip_data
+
+def look_up_points(points:list, tables:list):
+  ''' checks whether the points are not part of exclusion areas '''
+
+  if len(tables) == 0:
+    return "default"
+  
+  exists_conditions = [
+      f"EXISTS (SELECT 1 FROM \"{table}\" WHERE ROUND(\"{table}\".xcoord, 6) = input_points.xcoord "
+      f"AND ROUND(\"{table}\".ycoord, 6) = input_points.ycoord)"
+      for table in tables
+  ]
+  sql_query = f"""
+        SELECT xcoord, ycoord
+        FROM (VALUES {', '.join(['(%s, %s)'] * len(points))}) AS input_points(xcoord, ycoord)
+        WHERE {' AND '.join(exists_conditions)};
+    """
+  
+  query_params = [coord for point in points for coord in point]
+
+  connection = connect_to_db()
+  with connection.cursor() as cursor:
+        cursor.execute(sql_query, query_params)
+        matching_points = cursor.fetchall()
+
+  matching_points = [(float(row[0]), float(row[1])) for row in matching_points]
+
+  return matching_points
+
+def db_fetch_sample_points(valid_points = None, municipality = None): # utilized
+  """ """
+  #establishes connection to the database first
+  #st.text("Trying to connect to database...")
+  working_db = connect_to_db()
+  while working_db == None:
+    working_db = connect_to_db()
+
+  #this will allow the sql queries
+  #st.text("Successful!")
+  pointer = working_db.cursor()
+  
+  if municipality != None:
+    query = f'''SELECT xcoord, ycoord, adm3_en
+      FROM "IRENA_GHI_WS20_WS60 "
+      WHERE adm3_en = '{municipality}';'''
     
-    #MEY
-    mey_list_nsrdb, annual_energy_yield_nsrdb = solar.NSRDB_monthly_energy_yield(sum_months, len(valid_points), area=9, af=0.7, eta=0.2)
-    mey_list_irena, annual_energy_yield_irena = solar.IRENA_monthly_energy_yield(monthly_ghi_data, len(valid_points), area=9, af=0.7, eta=0.2)
->>>>>>> 041e7b1e4e0add571bf32715b874e22c3b73cbd8
+    pointer.execute(query)
+    data = pointer.fetchall()
+    return data
+#----------------------------------------------------------------------------------------
 
-    #CAP
-    solar_noon_hours = solar.monthlyGHI(latitude, longitude, 2017)
-    max_ghi = solar.highest_GHI_at_solar_noon(solar_data)
-    cap_nsrdb = solar.NSRDB_capacity(max_ghi, area=9)
-    cap_irena = IRENA_capacity (valid_points, len(valid_points), power_density=1000, area=9)
 
-    #CF
+# filter out invalid points (those that are exclusion areas based on user's constraint selection)
 
-    #LCOE
+temp_points =[]
+for tup in coordinate_tuples:
+    new_tup = (round(tup[1],6), round(tup[0],6))
+    temp_points.append(new_tup)
 
-    # process per month
-    for month in range(1, 13):
-    # compute energy yield using NSRDB dataset first
-        month_40ws = nsrdb_monthly40WS[month - 1]
-        month_60ws = nsrdb_monthly60WS[month - 1]
-        hours = len(month_40ws)
 
-        e_yield1, std = solar.calc_energy_yield(hours, len(valid_points), 40, month_40ws, 60, month_60ws, turbine_model )
-        NSRDB_monthly_energy_yield.append(e_yield1)
+if choose_from:
 
-    # st.write("Using IRENA:")
-    # st.write(f"month: {month} energy yield: {e_yield1} stdev: {std}")
-
-    #then compute using IRENA dataset
-        for point in range(len(irena_ds20)):
-
-            e_yield2 = solar.calc_energy_yield(hours, len(valid_points), 20, [irena_ds20[point][month -1]], 60, [irena_ds60[point][month -1]], turbine_model, nsrdb_stdev= std, source= "IRENA" )
-
-            month_point_yield.append(e_yield2)
-
-        total = 0
-        for point_yield in month_point_yield:
-            total += point_yield
-            
-        IRENA_monthly_energy_yield.append(total)
-
-    # st.write(f"e yield comparison ---- month: {month} nsrdb: {e_yield1} irena: {total}")
-    # diff = abs(e_yield1 - total)
-
-    # st.write(f"this is how much they differ: {str(round(diff, 2))}")
-
-    # handle municipality-based assessment
-
-    capacity = solar.compute_capacity(turbine_model, len(irena_ds20))
-    # st.write(f"capacity: {capacity}")
-
-    month_cntr = 0
-    irena_lcoe = []
-    nsrdb_lcoe = []
-
-    for e_yield in NSRDB_monthly_energy_yield:
-        month_60ws = nsrdb_monthly60WS[month_cntr]
-        hours = len(month_40ws)
-        nsrdb_cf = solar.compute_monthly_capacity_factor(e_yield, hours, capacity)
-        NSRDB_monthly_cf.append(nsrdb_cf)
-        nsrdb_lcoe.append(solar.compute_lcoe(nsrdb_cf))
-        month_cntr += 1
-
-    month_cntr = 0
-
-    for e_yield in IRENA_monthly_energy_yield:
-        month_60ws = nsrdb_monthly60WS[month_cntr]
-        hours = len(month_40ws)
-        irena_cf = solar.compute_monthly_capacity_factor(e_yield, hours, capacity)
-        irena_lcoe.append(solar.compute_lcoe(irena_cf))
-        IRENA_monthly_cf.append(irena_cf)
-        month_cntr += 1
-
-<<<<<<< HEAD
   valid_points = look_up_points(temp_points, choose_from)
 
 else:
   #st.write(f"filtered points: No Constraint Selected. ")
   valid_points = temp_points
+# st.write(str(valid_points))
+
+if slope_checker:
+    valid_points = solar.filter_slope(valid_points, slope)
+
+# st.write(valid_points)
+# st.write(slope)
 
 holder = []
 for point in valid_points:
@@ -1720,13 +1583,8 @@ lcoe_list_nsrdb = NSRDB_lcoe(cf_list_nsrdb)
 # st.write(f"cf list nsrdb: {cf_list_nsrdb}, cf percent nsrdb: {cf_percentage_list_nsrdb}")
 # st.write(f"lcoe list nsrdb: {lcoe_list_nsrdb}")
 
-eyield, cfactor, lcoee = plot_monthly_value(mey_list_irena, mey_list_nsrdb, cf_percentage_list_irena, cf_percentage_list_nsrdb,lcoe_list_irena, lcoe_list_nsrdb)
-st.write(f'mey irena: {mey_list_irena}')
-st.write(f'mey nsrdb: {mey_list_nsrdb}')
-st.write(f'cf_list_irena: {cf_percentage_list_irena}')
-st.write(f'cf_list_nsrdb: {cf_percentage_list_nsrdb}')
-st.write(f'lcoe_nsrdb: {lcoe_list_nsrdb}')
-st.write(f'lcoe_irena: {lcoe_list_irena}')
+eyield, cfactor, lcoee = plot_monthly_value(mey_list_irena, mey_list_nsrdb, cf_list_irena, cf_list_nsrdb,lcoe_list_irena, lcoe_list_nsrdb)
+
 with disp1:
     st.plotly_chart(eyield)
 
@@ -1736,156 +1594,148 @@ with disp2:
 with disp3:
     st.plotly_chart(lcoee)
 
-ave_yield_irena = annual_energy_yield_irena/12
-ave_yield_nsrdb = annual_energy_yield_nsrdb/12
-ave_lcoe_irena = sum(lcoe_list_irena)/12
-ave_lcoe_nsrdb = sum(lcoe_list_nsrdb)/12
+ave_yield = annual_energy_yield_irena/12
+ave_lcoe = sum(lcoe_list_irena)/12
 
-
-with summary:
-    st.markdown(f"""
-        <style>
-            .metric-container {{
-                background-color: #ffffff;
-                border-radius: 5px;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                margin-bottom: 8px;
-                overflow: hidden;
-            }}
-            .metric-header {{
-                background-color: #F75A5A;
-                padding: 8px;
-                text-align: center;
-            }}
-            .metric-title {{
-                font-size: 20px;
-                font-weight: bold;
-                color: white !important;
-                margin: 0;
-            }}
-            .metric-content {{
-                display: flex;
-                padding: 8px;
-            }}
-            .icon-container {{
-                flex: 0 0 80px;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-            }}
-            .icon {{
-                width: 80px;
-                height: 80px;
-            }}
-            .data-container {{
-                flex: 1;
-                padding-left: 10px;
-            }}
-            .data-row {{
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-bottom: 5px;
-            }}
-            .source-label {{
-                font-size: 17px;
-                font-weight: bold;
-                color: #000;
-                flex: 0 0 80px;
-            }}
-            .value {{
-                font-size: 18px;
-                font-weight: normal;
-                color: #000;
-                text-align: right;
-                flex: 1;
-            }}
-        </style>
-        
-        <!-- Capacity -->
-        <div class="metric-container">
-            <div class="metric-header">
-                <h2 class="metric-title">CAPACITY</h2>
-            </div>
-            <div class="metric-content">
-                <div class="icon-container">
-                    <img src="https://raw.githubusercontent.com/yelsha07/icons/refs/heads/main/1.png" class="icon" />
-                </div>
-                <div class="data-container">
-                    <div class="data-row">
-                        <div class="source-label">IRENA</div>
-                        <div class="value">{round((cap_irena), 3)} MW</div>
-                    </div>
-                    <div class="data-row">
-                        <div class="source-label">NSRDB</div>
-                        <div class="value">{round((cap_nsrdb), 3)} MW</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Energy Yield -->
-        <div class="metric-container">
-            <div class="metric-header">
-                <h2 class="metric-title">AVE. ENERGY YIELD</h2>
-            </div>
-            <div class="metric-content">
-                <div class="icon-container">
-                    <img src="https://raw.githubusercontent.com/yelsha07/icons/refs/heads/main/2.png" class="icon" />
-                </div>
-                <div class="data-container">
-                    <div class="data-row">
-                        <div class="source-label">IRENA</div>
-                        <div class="value">{round((ave_yield_irena), 3)} MWh</div>
-                    </div>
-                    <div class="data-row">
-                        <div class="source-label">NSRDB</div>
-                        <div class="value">{round((ave_yield_nsrdb), 3)} MWh</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- LCOE -->
-        <div class="metric-container">
-            <div class="metric-header">
-                <h2 class="metric-title">AVE. LCOE</h2>
-            </div>
-            <div class="metric-content">
-                <div class="icon-container">
-                    <img src="https://raw.githubusercontent.com/yelsha07/icons/refs/heads/main/3.png" class="icon" />
-                </div>
-                <div class="data-container">
-                    <div class="data-row">
-                        <div class="source-label">IRENA</div>
-                        <div class="value">₱{round((ave_lcoe_irena), 3)}/MWh</div>
-                    </div>
-                    <div class="data-row">
-                        <div class="source-label">NSRDB</div>
-                        <div class="value">₱{round((ave_lcoe_nsrdb), 3)}/MWh</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    #updated database
-=======
-ave_eyield = sum(IRENA_monthly_energy_yield)/12
-ave_lcoe = sum(irena_lcoe)/12
 with summary:
     st.markdown("""
     <div style="
         background-color: #F75A5A;
-        padding: 12px 20px;
-        border-radius: 10px;
+        padding: 8px 15px;
+        border-radius: 8px;
         box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-        font-size: 24px;
+        font-size: 20px;
         font-weight: 600;
         color: #FFFDF6;
-        margin-bottom: 15px;
+        margin-bottom: 10px;
     ">
         Summary
     </div>
-""", unsafe_allow_html=True)
->>>>>>> 041e7b1e4e0add571bf32715b874e22c3b73cbd8
+    """, unsafe_allow_html=True)
+    
+    st.markdown(f"""
+    <style>
+        .tooltip {{
+            position: relative;
+            display: inline-block;
+            cursor: pointer;
+        }}
+        .tooltip .tooltiptext {{
+            visibility: hidden;
+            width: 200px;
+            background-color: #555;
+            color: #fff;
+            text-align: left;
+            border-radius: 6px;
+            padding: 5px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -100px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 12px;
+        }}
+        .tooltip:hover .tooltiptext {{
+            visibility: visible;
+            opacity: 1;
+        }}
+        .container {{
+            text-align: center;
+            padding: 8px;
+            margin-bottom: 10px;
+            display: block;
+        }}
+        .metric {{
+            font-size: 16px;
+            font-weight: normal;
+            margin-top: 5px;
+            line-height: 1;
+        }}
+        .number {{
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: 5px;
+        }}
+        .icon {{
+            display: block;
+            margin: 0 auto;
+            width: 30px;
+            height: 30px;
+        }}
+    </style>
+
+    <div style="
+        background-color: #ffffff;
+        padding: 12px;
+        border-radius: 10px;
+        text-align: center;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        font-size: 18px;
+        font-weight: bold;
+        color: #333;
+        ">
+        <div class="container">
+            <img src="https://raw.githubusercontent.com/yelsha07/icons/refs/heads/main/1.png" width="30" height="30" class="icon" />
+            <div class="tooltip">
+                <p class="metric">Capacity</p>
+                <span class="tooltiptext">The total capacity of the system in watts (W). It indicates the maximum output that can be generated by the solar system.</span>
+            </div>
+            <div class="number">{round((cap_irena), 3)} MW</div>
+        </div>
+    </div>
+    <br>
+    """, unsafe_allow_html=True)
+
+    ey, lc = st.columns([1,1])
+
+    with ey:
+        st.markdown(f"""
+        <div style="
+            background-color: #ffffff;
+            padding: 12px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            width: 180px;
+            height: 160px;
+            ">
+            <div class="container">
+                <img src="https://raw.githubusercontent.com/yelsha07/icons/refs/heads/main/2.png" width="30" height="30" class="icon" />
+                <div class="tooltip">
+                    <p class="metric">Ave. Energy Yield</p>
+                    <span class="tooltiptext">The energy generated by the solar system, typically measured in watt-hours (Wh) or megawatt-hours (MWh). It depends on solar irradiation and capacity factor.</span>
+                </div>
+                <div class="number">{round((ave_yield), 3)} MWh</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with lc:
+        st.markdown(f"""
+        <div style="
+            background-color: #ffffff;
+            padding: 12px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            width: 180px;
+            height: 160px;
+            ">
+            <div class="container">
+                <img src="https://raw.githubusercontent.com/yelsha07/icons/refs/heads/main/3.png" width="30" height="30" class="icon" />
+                <div class="tooltip">
+                    <p class="metric">Ave. LCOE</p>
+                    <span class="tooltiptext">Levelized Cost of Energy: A measure of the cost per unit of energy produced over the system's lifetime, considering both capital and operational costs.</span>
+                </div>
+                <div class="number">₱{round((ave_lcoe), 3)}M</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)

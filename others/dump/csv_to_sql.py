@@ -12,7 +12,7 @@ DB_HOST = "localhost"
 DB_PORT = "5432"
 
 ROOT_FOLDER = "C:\\Users\\student\\Downloads\\CSV to postgreSQL"
-TABLE_NAME = "NSRDB_WIND1"
+TABLE_NAME = "NSRDB_SOLAR"
 
 print(f"Looking in: {ROOT_FOLDER}")
 
