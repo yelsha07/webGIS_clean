@@ -41,12 +41,18 @@ import others.solar_algo_new as solar
 
 
 # Set page config
+<<<<<<< HEAD
 st.set_page_config(layout="wide", page_title="Philippine Solar Potential Assessment")
 st.markdown("""
     <h1 style='text-align: center;'>
         Solar Potential Assessment
     </h1>
 """, unsafe_allow_html=True)
+=======
+st.set_page_config(layout="wide", page_title="Philippine Solar Energy Potential Assessment")
+
+st.title("Solar Potential Assessment")
+>>>>>>> 041e7b1e4e0add571bf32715b874e22c3b73cbd8
 st.markdown("Select a municipality, or draw a custom area (minimum 3km x 3km) to assess solar potential.")
 
 # --- Static file paths --- 
@@ -633,7 +639,7 @@ if st.session_state.selection_mode == "municipality":
         area_km2 = width_km * height_km
 
 
-
+    metric, graphs  = st.columns(2)
     # Display municipality metrics
     st.markdown("""
     <div style="
@@ -649,8 +655,19 @@ if st.session_state.selection_mode == "municipality":
         Municipality Information
     </div>
 """, unsafe_allow_html=True)
+<<<<<<< HEAD
     c1, c2 = st.columns(2)
     disp1, disp2, disp3 = st.columns([1,1,1])
+=======
+
+    col_metric1, col_metric2 = st.columns([1,2])
+    #c1, c2 = st.columns(2)
+    #c1.metric("Area", f"{area_km2:.2f} km²")
+    #c2.metric("Points within Municipality", f"{len(intersecting)}")
+
+    disp1, disp2, disp3 = st.columns([1,1,1])
+
+>>>>>>> 041e7b1e4e0add571bf32715b874e22c3b73cbd8
     interactive, summary = st.columns([2,1])
     # --- Map ---
     with interactive:
@@ -726,12 +743,21 @@ if st.session_state.selection_mode == "municipality":
         folium_static(m)
 
     # --- Table of points ---
+<<<<<<< HEAD
     # st.subheader(f"📍 {len(intersecting)} Points Inside {st.session_state.selected_muni}")
     # if not intersecting.empty:
     #     display_cols = [col for col in intersecting.columns if col != 'geometry']
     #     st.dataframe(intersecting[display_cols])
     # else:
     #     st.info("No points found within this municipality.")
+=======
+    #st.subheader(f"📍 {len(intersecting)} Points Inside {st.session_state.selected_muni}")
+    #if not intersecting.empty:
+    #    display_cols = [col for col in intersecting.columns if col != 'geometry']
+    #    st.dataframe(intersecting[display_cols])
+    #else:
+    #    st.info("No points found within this municipality.")
+>>>>>>> 041e7b1e4e0add571bf32715b874e22c3b73cbd8
 
 else:  # Draw Custom Area mode
     with col1:
@@ -755,6 +781,7 @@ else:  # Draw Custom Area mode
             # # Reset map click source flag after dropdown handling
             # st.session_state.map_click_source = False
         
+<<<<<<< HEAD
             # col_metric1, col_metric2 = st.columns(2)
 
 
@@ -809,6 +836,59 @@ else:  # Draw Custom Area mode
             )
 
 
+=======
+        # METRICS BELOW DRAWING INSTRUCTIONS
+        #st.markdown("### 📊 Dataset Information")
+        #col_metric1, col_metric2 = st.columns(2)
+        
+        # let user choose constraints first
+        st.write("Choose which constraints to apply.")
+
+        constraints_table = {0:"BuiltUp Constraints Removed", 1: "CADTs Constraints Removed", 2: "Forest Constraints Removed", 3: "Protected Areas Removed"}
+        choose_from = []
+
+        with st.container():
+            col1sub, col2sub = st.columns(2)
+
+            with col1sub:
+                ancestral = st.checkbox("Ancestral Domains")
+                if ancestral:
+                    choose_from.append(constraints_table[1])
+
+                tree_cover = st.checkbox("Tree Covers")
+                if tree_cover:
+                    choose_from.append(constraints_table[2])
+
+            with col2sub:
+                land_use = st.checkbox("Land Use")
+                if land_use:
+                    choose_from.append(constraints_table[0])
+                protected_areas =  st.checkbox("Protected Areas")
+                if protected_areas:
+                    choose_from.append(constraints_table[3])
+
+        
+
+        # let user choose the slope restrictions
+        slope = st.slider("Filter out slope of the land (%):", min_value=0.0, max_value=10.0, value=1.0, step=0.1)
+
+        st.markdown(f"""
+        <div style="
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            font-size: 25px;
+            font-weight: bold;
+            color: #333;
+            ">
+            Total Area: {9 * len(valid_points)} km²
+        </div>
+        <br>
+    """, unsafe_allow_html=True)
+        
+>>>>>>> 041e7b1e4e0add571bf32715b874e22c3b73cbd8
     with col2:
             # Create map with drawing tools
         try:
@@ -987,6 +1067,7 @@ elif st.session_state.selection_mode == "draw" and st.session_state.drawn_area:
         st.error(f"Error preparing download: {e}")
 
 ###
+<<<<<<< HEAD
 # Database connection function
 def get_db_connection():
     return psycopg2.connect(
@@ -1160,6 +1241,8 @@ sum_months = [] # NSRDB monthly ghi data
 monthly_ghi_data = [] # IRENA monthly ghi data
 
 
+=======
+>>>>>>> 041e7b1e4e0add571bf32715b874e22c3b73cbd8
 
 with col1:
     #rearrange and then round off to match with SQL database
@@ -1207,6 +1290,7 @@ with col1:
         <br>
     """, unsafe_allow_html=True)
 
+<<<<<<< HEAD
 def ave_ghi_nsrdb(solar_data): #NSRDB
     """
     Compute the average GHI per hour for the given solar_data
@@ -1435,92 +1519,103 @@ def IRENA_lcoe(cf_list_irena, fixed_charge_rate=0.092, capital_cost=75911092, fi
             lcoe_list_irena.append(lcoe_value_irena)
     
     return lcoe_list_irena
+=======
+with col_metric1:
+    # #fetch irena and nsrdb again for the valid points
+    solar_data = solar.db_fetch_hourly_solar(valid_points:list, municipality = None)
+    final_solar_data = solar.db_fetch_IRENA(valid_points, municipality = None)
 
-def obtain_municip(): # utilized
-  #establishes connection to the database first
-  #st.text("Trying to connect to database...")
-  working_db = connect_to_db()
-  while working_db == None:
-    working_db = connect_to_db()
+    #fetch NSRDB spatial average
+    sum_months = solar.ave_ghi_nsrdb(solar_data)
 
-  #this will allow the sql queries
-  #st.text("Successful!")
-  pointer = working_db.cursor()
-  
-  
-  query = f'''SELECT DISTINCT adm3_en
-  FROM "IRENA_GHI_WS20_WS60 ";'''
+    #fetch IRENA monthly
+    monthly_ghi_data = solar.IRENA_monthly_ghi(final_solar_data)
 
-  pointer.execute(query)
-  municip_data = pointer.fetchall() 
+    # # initialize
 
-  pointer.close()
-  working_db.close()
-
-
-  return municip_data
-
-def look_up_points(points:list, tables:list):
-  ''' checks whether the points are not part of exclusion areas '''
-
-  if len(tables) == 0:
-    return "default"
-  
-  exists_conditions = [
-      f"EXISTS (SELECT 1 FROM \"{table}\" WHERE ROUND(\"{table}\".xcoord, 6) = input_points.xcoord "
-      f"AND ROUND(\"{table}\".ycoord, 6) = input_points.ycoord)"
-      for table in tables
-  ]
-  sql_query = f"""
-        SELECT xcoord, ycoord
-        FROM (VALUES {', '.join(['(%s, %s)'] * len(points))}) AS input_points(xcoord, ycoord)
-        WHERE {' AND '.join(exists_conditions)};
-    """
-  
-  query_params = [coord for point in points for coord in point]
-
-  connection = connect_to_db()
-  with connection.cursor() as cursor:
-        cursor.execute(sql_query, query_params)
-        matching_points = cursor.fetchall()
-
-  matching_points = [(float(row[0]), float(row[1])) for row in matching_points]
-
-  return matching_points
-
-def db_fetch_sample_points(valid_points = None, municipality = None): # utilized
-  """ """
-  #establishes connection to the database first
-  #st.text("Trying to connect to database...")
-  working_db = connect_to_db()
-  while working_db == None:
-    working_db = connect_to_db()
-
-  #this will allow the sql queries
-  #st.text("Successful!")
-  pointer = working_db.cursor()
-  
-  if municipality != None:
-    query = f'''SELECT xcoord, ycoord, adm3_en
-      FROM "IRENA_GHI_WS20_WS60 "
-      WHERE adm3_en = '{municipality}';'''
+    NSRDB_monthly_energy_yield = []
+    IRENA_monthly_energy_yield = []
+    cf_list_nsrdb = []
+    cf_percentage_list_nsrdb = []
+    cf_list_irena = []
+    cf_percentage_list_irena = []
+    lcoe_list_nsrdb = []
+    lcoe_list_irena = []
     
-    pointer.execute(query)
-    data = pointer.fetchall()
-    return data
-#----------------------------------------------------------------------------------------
+    #MEY
+    mey_list_nsrdb, annual_energy_yield_nsrdb = solar.NSRDB_monthly_energy_yield(sum_months, len(valid_points), area=9, af=0.7, eta=0.2)
+    mey_list_irena, annual_energy_yield_irena = solar.IRENA_monthly_energy_yield(monthly_ghi_data, len(valid_points), area=9, af=0.7, eta=0.2)
+>>>>>>> 041e7b1e4e0add571bf32715b874e22c3b73cbd8
 
+    #CAP
+    solar_noon_hours = solar.monthlyGHI(latitude, longitude, 2017)
+    max_ghi = solar.highest_GHI_at_solar_noon(solar_data)
+    cap_nsrdb = solar.NSRDB_capacity(max_ghi, area=9)
+    cap_irena = IRENA_capacity (valid_points, len(valid_points), power_density=1000, area=9)
 
-# filter out invalid points (those that are exclusion areas based on user's constraint selection)
+    #CF
 
-temp_points =[]
-for tup in coordinate_tuples:
-    new_tup = (round(tup[1],6), round(tup[0],6))
-    temp_points.append(new_tup)
+    #LCOE
 
+    # process per month
+    for month in range(1, 13):
+    # compute energy yield using NSRDB dataset first
+        month_40ws = nsrdb_monthly40WS[month - 1]
+        month_60ws = nsrdb_monthly60WS[month - 1]
+        hours = len(month_40ws)
 
-if choose_from:
+        e_yield1, std = solar.calc_energy_yield(hours, len(valid_points), 40, month_40ws, 60, month_60ws, turbine_model )
+        NSRDB_monthly_energy_yield.append(e_yield1)
 
+    # st.write("Using IRENA:")
+    # st.write(f"month: {month} energy yield: {e_yield1} stdev: {std}")
+
+    #then compute using IRENA dataset
+        for point in range(len(irena_ds20)):
+
+            e_yield2 = solar.calc_energy_yield(hours, len(valid_points), 20, [irena_ds20[point][month -1]], 60, [irena_ds60[point][month -1]], turbine_model, nsrdb_stdev= std, source= "IRENA" )
+
+            month_point_yield.append(e_yield2)
+
+        total = 0
+        for point_yield in month_point_yield:
+            total += point_yield
+            
+        IRENA_monthly_energy_yield.append(total)
+
+    # st.write(f"e yield comparison ---- month: {month} nsrdb: {e_yield1} irena: {total}")
+    # diff = abs(e_yield1 - total)
+
+    # st.write(f"this is how much they differ: {str(round(diff, 2))}")
+
+    # handle municipality-based assessment
+
+    capacity = solar.compute_capacity(turbine_model, len(irena_ds20))
+    # st.write(f"capacity: {capacity}")
+
+    month_cntr = 0
+    irena_lcoe = []
+    nsrdb_lcoe = []
+
+    for e_yield in NSRDB_monthly_energy_yield:
+        month_60ws = nsrdb_monthly60WS[month_cntr]
+        hours = len(month_40ws)
+        nsrdb_cf = solar.compute_monthly_capacity_factor(e_yield, hours, capacity)
+        NSRDB_monthly_cf.append(nsrdb_cf)
+        nsrdb_lcoe.append(solar.compute_lcoe(nsrdb_cf))
+        month_cntr += 1
+
+    month_cntr = 0
+
+    for e_yield in IRENA_monthly_energy_yield:
+        month_60ws = nsrdb_monthly60WS[month_cntr]
+        hours = len(month_40ws)
+        irena_cf = solar.compute_monthly_capacity_factor(e_yield, hours, capacity)
+        irena_lcoe.append(solar.compute_lcoe(irena_cf))
+        IRENA_monthly_cf.append(irena_cf)
+        month_cntr += 1
+
+<<<<<<< HEAD
   valid_points = look_up_points(temp_points, choose_from)
 
 else:
@@ -1775,3 +1870,22 @@ with summary:
         """, unsafe_allow_html=True)
 
     #updated database
+=======
+ave_eyield = sum(IRENA_monthly_energy_yield)/12
+ave_lcoe = sum(irena_lcoe)/12
+with summary:
+    st.markdown("""
+    <div style="
+        background-color: #F75A5A;
+        padding: 12px 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        font-size: 24px;
+        font-weight: 600;
+        color: #FFFDF6;
+        margin-bottom: 15px;
+    ">
+        Summary
+    </div>
+""", unsafe_allow_html=True)
+>>>>>>> 041e7b1e4e0add571bf32715b874e22c3b73cbd8

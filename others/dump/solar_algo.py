@@ -158,6 +158,7 @@ def db_fetch_IRENA_solar(valid_points:list, municipality = None):
 # sum_months = [] # NSRDB monthly ghi data
 # monthly_ghi_data = [] # IRENA monthly ghi data
 
+
 # def ave_ghi_nsrdb(solar_data): #NSRDB
 #     """
 #     Compute the average GHI per hour and store in munip_hourly_list.
@@ -236,8 +237,8 @@ def db_fetch_IRENA_solar(valid_points:list, municipality = None):
 #     Returns:
 #     - solar_noon_hours (dict): Dictionary with dates as keys and rounded solar noon hour (local time) as values.
 #     """
-# #-------------------------------------------------------------------------------------------------------
-# #COMPUTING FOR NSRDB POWER DENSITY
+#-------------------------------------------------------------------------------------------------------
+#COMPUTING FOR NSRDB POWER DENSITY
 # def monthlyGHI(latitude, longitude, year):
 #     observer = ephem.Observer()
 #     observer.lat, observer.lon = str(latitude), str(longitude)
@@ -410,44 +411,14 @@ def look_up_points(points:list, tables:list):
 #     data = pointer.fetchall()
 #     return data
 # #----------------------------------------------------------------------------------------
-# # the following lines are used to display on the website
-# sample_munip = obtain_municip()
-# sample_munip = sorted([row[0] for row in sample_munip])
 
-
-# # let user choose constraints first
-# st.write("Choose which constraints to apply.")
-
-# constraints_table = {0:"BuiltUp Constraints Removed", 1: "CADTs Constraints Removed", 2: "Forest Constraints Removed", 3: "Protected Areas Removed"}
-# choose_from = []
-
-# with st.container():
-#     col1, col2 = st.columns(2)
-
-#     with col1:
-#         ancestral = st.checkbox("Ancestral Domains")
-#         if ancestral:
-#           choose_from.append(constraints_table[1])
-
-#         tree_cover = st.checkbox("Tree Covers")
-#         if tree_cover:
-#           choose_from.append(constraints_table[2])
-
-#     with col2:
-#         land_use = st.checkbox("Land Use")
-#         if land_use:
-#           choose_from.append(constraints_table[0])
-#         protected_areas =  st.checkbox("Protected Areas")
-#         if protected_areas:
-#           choose_from.append(constraints_table[3])
-
-
-# # Display dropdown
-# selected_option = st.selectbox("Choose a municipality:", sample_munip)
 
 # # filter out invalid points (those that are exclusion areas based on user's constraint selection)
-# temp_points = db_fetch_sample_points(municipality = selected_option)
-# temp_points = [(round(float(row[0]), 6), round(float(row[1]), 6)) for row in temp_points]
+
+# temp_points =[]
+# for tup in coordinate_tuples:
+#     new_tup = (round(tup[1],6), round(tup[0],6))
+#     temp_points.append(new_tup)
 
 
 # if choose_from:
@@ -461,34 +432,3 @@ def look_up_points(points:list, tables:list):
 #   st.write(f"filtered points: No Constraint Selected. ")
 #   valid_points = temp_points
 
-# #call functions here
-
-# irena_solar_data = db_fetch_IRENA_solar(valid_points)
-# # nsrdb_solar_data = db_fetch_hourly_solar(valid_points)
-
-# monthly_ghi_data = IRENA_monthly_ghi(irena_solar_data)
-
-# mey_list_irena, annual_energy_yield_irena = IRENA_monthly_energy_yield(monthly_ghi_data, valid_points, area=9, af=0.7, eta=0.2)
-# cap_irena = IRENA_capacity (valid_points,power_density=1000, area=9)
-# cf_list_irena, cf_percentage_list_irena = IRENA_capacity_factor(cap_irena, mey_list_irena)
-# lcoe_list_irena = IRENA_lcoe(cf_list_irena)
-
-# # solar_data = [()]
-# # sum_months = ave_ghi_nsrdb(solar_data)
-# # mey_list_irena, annual_energy_yield_irena = IRENA_monthly_energy_yield(area=9, af=0.7, eta=0.2)
-# # cap_irena = IRENA_capacity (len(valid_points),power_density=1000, area=9)
-# # cf_list_irena, cf_percentage_list_irena = IRENA_capacity_factor(cap_irena, mey_list_irena)
-# # lcoe_list_irena = IRENA_lcoe(cf_list_irena)
-
-# st.write(f"MEY list irena: {mey_list_irena}, annual energy yield irena: {annual_energy_yield_irena}")
-# st.write(f"cap irena: {cap_irena}")
-# st.write(f"cf list: {cf_list_irena}, cf percent: {cf_percentage_list_irena}")
-# st.write(f"lcoe list irena: {lcoe_list_irena}")
-
-# # st.write(valid_points)
-# # st.write(str(irena_solar_data)
-
-# # st.write(mey_list_irena, annual_energy_yield_irena)
-# # st.write(cap_irena)
-# # st.write(cf_list_irena, cf_percentage_list_irena)
-# # st.write(lcoe_list_irena)
